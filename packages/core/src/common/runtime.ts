@@ -1,12 +1,7 @@
 import { z } from "zod";
-import type {
-  ToolExecutionContext,
-  ToolExecutionResult,
-} from "../tools/executor";
+import type { ToolExecutionContext, ToolExecutionResult } from "../tools/executor";
 
-export type ValidationResult =
-  | { ok: true; input: Record<string, unknown> }
-  | { ok: false; error: string };
+export type ValidationResult = { ok: true; input: Record<string, unknown> } | { ok: false; error: string };
 
 export function semanticBoolean(defaultValue = false) {
   return z.preprocess((value) => {
@@ -31,24 +26,16 @@ export function semanticInteger(label: string, options: { min?: number } = {}) {
     z
       .number()
       .int()
-      .min(
-        options.min ?? Number.MIN_SAFE_INTEGER,
-        `${label} must be >= ${options.min ?? Number.MIN_SAFE_INTEGER}.`,
-      ),
+      .min(options.min ?? Number.MIN_SAFE_INTEGER, `${label} must be >= ${options.min ?? Number.MIN_SAFE_INTEGER}.`),
   );
 }
 
-export async function executeValidatedTool<
-  TSchema extends z.ZodType<Record<string, unknown>>,
->(
+export async function executeValidatedTool<TSchema extends z.ZodType<Record<string, unknown>>>(
   name: string,
   schema: TSchema,
   rawArgs: Record<string, unknown>,
   context: ToolExecutionContext,
-  handler: (
-    input: z.infer<TSchema>,
-    context: ToolExecutionContext,
-  ) => Promise<ToolExecutionResult>,
+  handler: (input: z.infer<TSchema>, context: ToolExecutionContext) => Promise<ToolExecutionResult>,
   options: {
     preprocess?: (args: Record<string, unknown>) => ValidationResult;
   } = {},

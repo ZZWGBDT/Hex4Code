@@ -23,14 +23,8 @@ export async function handleGitTool(
   try {
     switch (action) {
       case "status": {
-        const status = execSync("git status --short", {
-          cwd: projectDir,
-          encoding: "utf8",
-        });
-        const branchOut = execSync("git branch --show-current", {
-          cwd: projectDir,
-          encoding: "utf8",
-        }).trim();
+        const status = execSync("git status --short", { cwd: projectDir, encoding: "utf8" });
+        const branchOut = execSync("git branch --show-current", { cwd: projectDir, encoding: "utf8" }).trim();
         return {
           ok: true,
           name: "git",
@@ -40,14 +34,8 @@ export async function handleGitTool(
 
       case "diff": {
         const staged = args.staged === true;
-        const diff = execSync(`git diff${staged ? " --staged" : ""} --stat`, {
-          cwd: projectDir,
-          encoding: "utf8",
-        });
-        const diffContent = execSync(`git diff${staged ? " --staged" : ""}`, {
-          cwd: projectDir,
-          encoding: "utf8",
-        });
+        const diff = execSync(`git diff${staged ? " --staged" : ""} --stat`, { cwd: projectDir, encoding: "utf8" });
+        const diffContent = execSync(`git diff${staged ? " --staged" : ""}`, { cwd: projectDir, encoding: "utf8" });
         const truncate = diffContent.length > 5000;
         return {
           ok: true,
@@ -59,52 +47,29 @@ export async function handleGitTool(
 
       case "commit": {
         if (!message) {
-          return {
-            ok: false,
-            name: "git",
-            error: "Commit message is required",
-          };
+          return { ok: false, name: "git", error: "Commit message is required" };
         }
         // Auto-stage tracked files
         execSync("git add -u", { cwd: projectDir });
-        const result = execSync(
-          `git commit -m "${message.replace(/"/g, '\\"')}"`,
-          {
-            cwd: projectDir,
-            encoding: "utf8",
-          },
-        );
+        const result = execSync(`git commit -m "${message.replace(/"/g, '\\"')}"`, {
+          cwd: projectDir,
+          encoding: "utf8",
+        });
         return { ok: true, name: "git", output: result.trim() };
       }
 
       case "log": {
-        const count = Math.min(
-          Math.max(1, typeof args.count === "number" ? args.count : 10),
-          50,
-        );
-        const log = execSync(`git log --oneline --graph -${count}`, {
-          cwd: projectDir,
-          encoding: "utf8",
-        });
+        const count = Math.min(Math.max(1, typeof args.count === "number" ? args.count : 10), 50);
+        const log = execSync(`git log --oneline --graph -${count}`, { cwd: projectDir, encoding: "utf8" });
         return { ok: true, name: "git", output: log.trim() || "(no commits)" };
       }
 
       case "review": {
         // Generate a code review summary from staged diff
-        const diff = execSync("git diff --staged", {
-          cwd: projectDir,
-          encoding: "utf8",
-        });
-        const files = execSync("git diff --staged --name-status", {
-          cwd: projectDir,
-          encoding: "utf8",
-        });
+        const diff = execSync("git diff --staged", { cwd: projectDir, encoding: "utf8" });
+        const files = execSync("git diff --staged --name-status", { cwd: projectDir, encoding: "utf8" });
         if (!diff.trim()) {
-          return {
-            ok: true,
-            name: "git",
-            output: "No staged changes to review.",
-          };
+          return { ok: true, name: "git", output: "No staged changes to review." };
         }
         const insertions = (diff.match(/^\+/gm) || []).length;
         const deletions = (diff.match(/^-/gm) || []).length;
@@ -117,12 +82,7 @@ export async function handleGitTool(
 
       case "pr": {
         const title = message || "WIP";
-        const source =
-          branch ||
-          execSync("git branch --show-current", {
-            cwd: projectDir,
-            encoding: "utf8",
-          }).trim();
+        const source = branch || execSync("git branch --show-current", { cwd: projectDir, encoding: "utf8" }).trim();
         const dest = target || "main";
         return {
           ok: true,

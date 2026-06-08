@@ -8,9 +8,9 @@ Key benefits over bash+make:
 - Handles clean builds, custom targets, and extra compile flags
 
 Usage:
-- Build a project: `build({project: "HEX4"})`
-- Build a specific target: `build({project: "HEX4", target: "test_all"})`
-- Clean build: `build({project: "HEX4", clean: true})`
+- Build a project: `build({project: "HEX4密码"})`
+- Build a specific target: `build({project: "HEX4密码", target: "test_all"})`
+- Clean build: `build({project: "HEX4密码", clean: true})`
 
 Supported build systems:
 - Makefile (auto-detected in project directory)

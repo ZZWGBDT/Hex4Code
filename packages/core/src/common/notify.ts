@@ -1,10 +1,7 @@
 import { spawn, type SpawnOptions } from "child_process";
 
 type NotifyChildProcess = {
-  once(
-    event: "error",
-    listener: (error: NodeJS.ErrnoException) => void,
-  ): NotifyChildProcess;
+  once(event: "error", listener: (error: NodeJS.ErrnoException) => void): NotifyChildProcess;
   unref(): void;
 };
 
@@ -19,10 +16,7 @@ export function formatDurationSeconds(durationMs: number): string {
   return String(Math.floor(safeMs / 1000));
 }
 
-export function buildNotifyEnv(
-  durationMs: number,
-  baseEnv: NodeJS.ProcessEnv = process.env,
-): NodeJS.ProcessEnv {
+export function buildNotifyEnv(durationMs: number, baseEnv: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
   return {
     ...baseEnv,
     DURATION: formatDurationSeconds(durationMs),

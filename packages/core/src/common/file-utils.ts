@@ -46,32 +46,22 @@ export function writeTextFile(
   lineEndings: FileLineEnding,
 ): number {
   const normalized = normalizeContent(content);
-  const toWrite =
-    lineEndings === "CRLF" ? normalized.replace(/\n/g, "\r\n") : normalized;
+  const toWrite = lineEndings === "CRLF" ? normalized.replace(/\n/g, "\r\n") : normalized;
   fs.writeFileSync(filePath, toWrite, { encoding });
-  return Buffer.byteLength(
-    toWrite,
-    encoding === "utf16le" ? "utf16le" : "utf8",
-  );
+  return Buffer.byteLength(toWrite, encoding === "utf16le" ? "utf16le" : "utf8");
 }
 
 export function ensureParentDirectory(filePath: string): void {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
 }
 
-export function hasFileChangedSinceState(
-  filePath: string,
-  state: FileState,
-): boolean {
+export function hasFileChangedSinceState(filePath: string, state: FileState): boolean {
   const current = readTextFileWithMetadata(filePath);
   if (current.timestamp <= state.timestamp) {
     return false;
   }
 
-  const isFullRead =
-    !state.isPartialView &&
-    typeof state.offset === "undefined" &&
-    typeof state.limit === "undefined";
+  const isFullRead = !state.isPartialView && typeof state.offset === "undefined" && typeof state.limit === "undefined";
 
   return !(isFullRead && current.content === state.content);
 }
@@ -82,8 +72,7 @@ export function buildDiffPreview(
   updatedContent: string,
   maxLines = 40,
 ): string | null {
-  const original =
-    originalContent === null ? null : normalizeContent(originalContent);
+  const original = originalContent === null ? null : normalizeContent(originalContent);
   const updated = normalizeContent(updatedContent);
 
   if (original !== null && original === updated) {
@@ -94,11 +83,7 @@ export function buildDiffPreview(
   const newLines = toDiffLines(updated);
 
   let prefix = 0;
-  while (
-    prefix < oldLines.length &&
-    prefix < newLines.length &&
-    oldLines[prefix] === newLines[prefix]
-  ) {
+  while (prefix < oldLines.length && prefix < newLines.length && oldLines[prefix] === newLines[prefix]) {
     prefix += 1;
   }
 
@@ -106,8 +91,7 @@ export function buildDiffPreview(
   while (
     suffix < oldLines.length - prefix &&
     suffix < newLines.length - prefix &&
-    oldLines[oldLines.length - 1 - suffix] ===
-      newLines[newLines.length - 1 - suffix]
+    oldLines[oldLines.length - 1 - suffix] === newLines[newLines.length - 1 - suffix]
   ) {
     suffix += 1;
   }

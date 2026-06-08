@@ -1,13 +1,13 @@
 /// @file provider-registry.ts
-/// @brief 多模型Provider注册表 — 管理所有模型提供商的API配置和模型定义
+/// @brief Multi-model Provider registry — manages API configuration and model definitions for all model providers
 ///
-/// 支持7个Provider、20+模型的统一注册管理。
-/// 所有模型信息（ID、能力、上下文窗口、价格）集中定义，供路由引擎和UI使用。
+/// Unified registry supporting 7 providers and 20+ models.
+/// All model information (ID, capabilities, context window, pricing) is defined centrally for use by the routing engine and UI.
 ///
-/// @设计原则：
-///   - 纯数据层，零外部依赖（不依赖OpenAI SDK、不依赖任何HEX4内部模块）
-///   - 静态注册，编译时确定，无运行时加载
-///   - 所有价格单位为美元/百万token（$ per 1M tokens）
+/// @Design principles:
+///   - Pure data layer, zero external dependencies (no OpenAI SDK, no HEX4 internal modules)
+///   - Static registration, determined at compile time, no runtime loading
+///   - All prices in USD per million tokens ($ per 1M tokens)
 
 // ── Provider 标识符 ──────────────────────────────────────────────
 export type ModelProvider =
@@ -19,15 +19,12 @@ export type ModelProvider =
   | "minimax"
   | "glm"
   | "anthropic"
-  | "groq";
+  | "groq"
+  | "mistral"
+  | "custom";
 
 /** 模型能力标签 — 用于任务-模型匹配 */
-export type ModelCapability =
-  | "code"
-  | "reasoning"
-  | "analysis"
-  | "chat"
-  | "fast";
+export type ModelCapability = "code" | "reasoning" | "analysis" | "chat" | "fast" | "fim";
 
 // ── 模型定义 ─────────────────────────────────────────────────────
 export type ModelDef = {
@@ -119,6 +116,15 @@ export const PROVIDERS: ProviderConfig[] = [
         contextWindow: 128_000,
         costPer1MInput: 0.55,
         costPer1MOutput: 2.19,
+      },
+      {
+        id: "deepseek-coder-v2",
+        provider: "deepseek",
+        label: "DeepSeek Coder V2",
+        capabilities: ["code", "fim", "fast"],
+        contextWindow: 128_000,
+        costPer1MInput: 0.14,
+        costPer1MOutput: 0.42,
       },
     ],
   },
@@ -236,8 +242,7 @@ export const PROVIDERS: ProviderConfig[] = [
     id: "ernie",
     name: "文心一言",
     apiKeyEnv: "ERNIE_API_KEY",
-    defaultBaseURL:
-      "https://aip.baidubce.com/rpc/2.0/ai_custom/v1/wenxinworkshop",
+    defaultBaseURL: "https://aip.baidubce.com/rpc/2.0/ai_custom/v1/wenxinworkshop",
     supportsStreaming: true,
     supportsThinking: false,
     supportsMultimodal: false,
@@ -383,6 +388,40 @@ export const PROVIDERS: ProviderConfig[] = [
       },
     ],
   },
+
+  // ── Mistral (Codestral) ──────────────────────────────────────────
+  // FIM 补全能力业界领先，专为代码生成优化
+  {
+    id: "mistral",
+    name: "Mistral (Codestral)",
+    apiKeyEnv: "MISTRAL_API_KEY",
+    defaultBaseURL: "https://api.mistral.ai/v1",
+    supportsStreaming: true,
+    supportsThinking: false,
+    supportsMultimodal: false,
+    models: [
+      {
+        id: "codestral-latest",
+        provider: "mistral",
+        label: "Codestral (FIM)",
+        capabilities: ["code", "fim", "reasoning"],
+        contextWindow: 256_000,
+        costPer1MInput: 0.0,
+        costPer1MOutput: 0.0,
+      },
+    ],
+  },
+
+  {
+    id: "custom",
+    name: "Custom (OpenAI Compatible)",
+    apiKeyEnv: "CUSTOM_API_KEY",
+    defaultBaseURL: "http://localhost:11434/v1",
+    supportsStreaming: true,
+    supportsThinking: false,
+    supportsMultimodal: true,
+    models: [],
+  },
 ];
 
 // ── 索引（用于快速查找） ──────────────────────────────────────────
@@ -408,17 +447,18 @@ export function getModelDef(modelId: string): ModelDef | undefined {
   return MODEL_BY_ID.get(modelId);
 }
 
+/** 判断模型 ID 是否已在内置注册表中。 */
+export function isRegisteredModel(modelId: string): boolean {
+  return MODEL_BY_ID.has(modelId);
+}
+
 /** 按Provider ID查找Provider配置 */
-export function getProvider(
-  providerId: ModelProvider,
-): ProviderConfig | undefined {
+export function getProvider(providerId: ModelProvider): ProviderConfig | undefined {
   return PROVIDER_BY_ID.get(providerId);
 }
 
 /** 查找包含某个模型ID的Provider */
-export function getProviderByModel(
-  modelId: string,
-): ProviderConfig | undefined {
+export function getProviderByModel(modelId: string): ProviderConfig | undefined {
   const def = MODEL_BY_ID.get(modelId);
   if (!def) return undefined;
   return PROVIDER_BY_ID.get(def.provider);
@@ -443,19 +483,14 @@ export function getModelsByProvider(providerId: ModelProvider): string[] {
 }
 
 /** 判断模型是否有某个能力 */
-export function modelHasCapability(
-  modelId: string,
-  capability: ModelCapability,
-): boolean {
+export function modelHasCapability(modelId: string, capability: ModelCapability): boolean {
   const def = MODEL_BY_ID.get(modelId);
   if (!def) return false;
   return def.capabilities.includes(capability);
 }
 
 /** 获取推荐用于某种任务的模型列表（按性价比排序） */
-export function getRecommendedModels(
-  task: "completion" | "generation" | "analysis" | "review" | "chat",
-): ModelDef[] {
+export function getRecommendedModels(task: "completion" | "generation" | "analysis" | "review" | "chat" | "fim"): ModelDef[] {
   // 任务→所需能力的映射
   const requiredCapability: Record<string, ModelCapability> = {
     completion: "fast",
@@ -463,15 +498,14 @@ export function getRecommendedModels(
     analysis: "analysis",
     review: "reasoning",
     chat: "chat",
+    fim: "fim",
   };
   const cap = requiredCapability[task] || "chat";
   return getModelsByCapability(cap);
 }
 
 /** 获取默认路由（任务→最便宜的可用模型ID） */
-export function getDefaultModelForTask(
-  task: "completion" | "generation" | "analysis" | "review" | "chat",
-): string {
+export function getDefaultModelForTask(task: "completion" | "generation" | "analysis" | "review" | "chat" | "fim"): string {
   const recommended = getRecommendedModels(task);
   if (recommended.length === 0) return "deepseek-v4-flash";
   return recommended[0].id; // 最便宜

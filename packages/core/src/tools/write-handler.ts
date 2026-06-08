@@ -8,13 +8,7 @@ import {
   writeTextFile,
 } from "../common/file-utils";
 import { executeValidatedTool } from "../common/runtime";
-import {
-  getFileState,
-  isAbsoluteFilePath,
-  isFullFileView,
-  normalizeFilePath,
-  recordFileState,
-} from "../common/state";
+import { getFileState, isAbsoluteFilePath, isFullFileView, normalizeFilePath, recordFileState } from "../common/state";
 
 const writeSchema = z.strictObject({
   file_path: z.string().min(1, "file_path is required."),
@@ -56,8 +50,7 @@ export async function handleWriteTool(
         try {
           stat = fs.statSync(filePath);
         } catch (error) {
-          const message =
-            error instanceof Error ? error.message : String(error);
+          const message = error instanceof Error ? error.message : String(error);
           return {
             ok: false,
             name: "write",
@@ -87,8 +80,7 @@ export async function handleWriteTool(
             return {
               ok: false,
               name: "write",
-              error:
-                "File has been modified since read. Read it again before writing.",
+              error: "File has been modified since read. Read it again before writing.",
             };
           }
         }
@@ -101,12 +93,7 @@ export async function handleWriteTool(
 
         const encoding = "utf8";
         const lineEndings = input.content.includes("\r\n") ? "CRLF" : "LF";
-        const bytes = writeTextFile(
-          filePath,
-          normalizedContent,
-          encoding,
-          lineEndings,
-        );
+        const bytes = writeTextFile(filePath, normalizedContent, encoding, lineEndings);
         const lineCount = normalizedContent.split("\n").length;
 
         recordFileState(context.sessionId, {
@@ -117,12 +104,11 @@ export async function handleWriteTool(
           lineEndings,
         });
 
-        const sizeLabel =
-          bytes < 1024
-            ? `${bytes}B`
-            : bytes < 1024 * 1024
-              ? `${(bytes / 1024).toFixed(1)}KB`
-              : `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
+        const sizeLabel = bytes < 1024
+          ? `${bytes}B`
+          : bytes < 1024 * 1024
+            ? `${(bytes / 1024).toFixed(1)}KB`
+            : `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
 
         return {
           ok: true,
@@ -151,10 +137,7 @@ export async function handleWriteTool(
     },
     {
       preprocess: (rawInput) => {
-        const filePath =
-          typeof rawInput.file_path === "string"
-            ? normalizeFilePath(rawInput.file_path)
-            : "";
+        const filePath = typeof rawInput.file_path === "string" ? normalizeFilePath(rawInput.file_path) : "";
         const content = rawInput.content;
         if (
           filePath.toLowerCase().endsWith(".json") &&
@@ -180,10 +163,7 @@ export async function handleWriteTool(
         repairMetadata = null;
         return {
           ok: true,
-          input:
-            typeof rawInput.file_path === "string"
-              ? { ...rawInput, file_path: filePath }
-              : rawInput,
+          input: typeof rawInput.file_path === "string" ? { ...rawInput, file_path: filePath } : rawInput,
         };
       },
     },

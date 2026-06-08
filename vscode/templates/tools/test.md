@@ -10,7 +10,7 @@ Key benefits over bash+./test_all:
 
 Usage:
 - `test({binary: "./test_all"})` — run all tests
-- `test({project: "HEX4"})` — auto-discover and run tests in a project
+- `test({project: "HEX4密码"})` — auto-discover and run tests in a project
 - `test({binary: "./test_all", filter: "tc_inject"})` — run specific test by name
 - `test({binary: "./test_all", timeout: 120})` — with custom timeout
 

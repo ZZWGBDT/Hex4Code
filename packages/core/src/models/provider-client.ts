@@ -1,15 +1,15 @@
 /// @file provider-client.ts
-/// @brief 多模型Provider客户端工厂 — 根据模型ID创建对应的API客户端
+/// @brief Multi-model Provider client factory — creates API clients based on model ID
 ///
-/// 支持的Provider类型：
-///   - OpenAI兼容API：DeepSeek、OpenAI、千问、文心、MiniMax、GLM
-///     → 统一使用 OpenAI SDK (openai)
-///   - Google AI：Gemini
-///     → 使用 Google Generative AI SDK (@google/generative-ai)
+/// Supported Provider types:
+///   - OpenAI-compatible APIs: DeepSeek, OpenAI, Qwen, ERNIE, MiniMax, GLM
+///     -> Unified via OpenAI SDK (openai)
+///   - Google AI: Gemini
+///     -> Uses Google Generative AI SDK (@google/generative-ai)
 ///
-/// @设计原则：
-///   - 工厂模式，调用方不直接依赖具体SDK
-///   - Gemini适配器提供与OpenAI兼容的接口签名
+/// @Design principles:
+///   - Factory pattern, callers do not directly depend on specific SDKs
+///   - Gemini adapter provides an interface signature compatible with OpenAI
 ///   - 所有客户端懒加载（只在首次使用时创建）
 
 import { getProviderByModel } from "./provider-registry";
@@ -101,6 +101,9 @@ export function createClient(config: ClientConfig): UnifiedClient | null {
 
   const provider = getProviderByModel(modelId);
   if (!provider) {
+    if (baseURLOverride) {
+      return createOpenAICompatibleClient(apiKey, baseURLOverride);
+    }
     return null;
   }
 
@@ -148,13 +151,11 @@ class GeminiAdapter implements GeminiClient {
     completions: {
       create: async (params: GeminiChatParams): Promise<GeminiResponse> => {
         // Gemini API 的消息格式转换
-        const systemMsg =
-          params.messages.find((m) => m.role === "system")?.content || "";
+        const systemMsg = params.messages.find((m) => m.role === "system")?.content || "";
         const history = params.messages
           .filter((m) => m.role !== "system")
           .map((m) => ({
-            role:
-              m.role === "assistant" ? ("model" as const) : ("user" as const),
+            role: m.role === "assistant" ? ("model" as const) : ("user" as const),
             parts: [{ text: m.content }],
           }));
 
@@ -165,26 +166,19 @@ class GeminiAdapter implements GeminiClient {
             maxOutputTokens: params.max_tokens ?? 4096,
             temperature: params.temperature ?? 0.7,
           },
-          systemInstruction: systemMsg
-            ? { parts: [{ text: systemMsg }] }
-            : undefined,
+          systemInstruction: systemMsg ? { parts: [{ text: systemMsg }] } : undefined,
         };
 
         // 调用 Gemini API
-        const response = await fetch(
-          `${this.baseURL}/models/${params.model}:generateContent?key=${this.apiKey}`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(requestBody),
-          },
-        );
+        const response = await fetch(`${this.baseURL}/models/${params.model}:generateContent?key=${this.apiKey}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(requestBody),
+        });
 
         if (!response.ok) {
           const errorText = await response.text();
-          throw new Error(
-            `Gemini API error (${response.status}): ${errorText}`,
-          );
+          throw new Error(`Gemini API error (${response.status}): ${errorText}`);
         }
 
         const data = (await response.json()) as GeminiRawResponse;
@@ -211,8 +205,7 @@ class GeminiAdapter implements GeminiClient {
                 prompt_tokens: data.usageMetadata.promptTokenCount ?? 0,
                 completion_tokens: data.usageMetadata.candidatesTokenCount ?? 0,
                 total_tokens:
-                  (data.usageMetadata.promptTokenCount ?? 0) +
-                  (data.usageMetadata.candidatesTokenCount ?? 0),
+                  (data.usageMetadata.promptTokenCount ?? 0) + (data.usageMetadata.candidatesTokenCount ?? 0),
               }
             : undefined,
         };

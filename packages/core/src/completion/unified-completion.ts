@@ -19,12 +19,7 @@ import { createClient } from "../models/provider-client";
 // ── Pattern-based completions ────────────────────────────────────────
 
 const HEX4_PATTERNS: Record<string, string[]> = {
-  hex4_: [
-    "hex4_tc_propagate(",
-    "hex4_sm2_sign(",
-    "hex4_model_forward(",
-    "hex4_vm_exec(",
-  ],
+  hex4_: ["hex4_tc_propagate(", "hex4_sm2_sign(", "hex4_model_forward(", "hex4_vm_exec("],
   TC_: ["TC_NONE", "TC_CARRY", "TC_UNCERTAIN", "TC_MIXED"],
   ternary_: ["ternary_core_lite(", "ternary_register_file("],
   Hex4: ["Hex4DualTrit", "Hex4IRGraph", "Hex4Session", "Hex4VMInstance"],
@@ -33,25 +28,11 @@ const HEX4_PATTERNS: Record<string, string[]> = {
   sm2_: ["sm2_sign(", "sm2_verify(", "sm2_encrypt(", "sm2_decrypt("],
 };
 
-const HEX4_STRUCT_TYPES = [
-  "TCMatrix",
-  "BalancedTrit",
-  "TCType",
-  "Hex4Tensor",
-  "Hex4Node",
-];
+const HEX4_STRUCT_TYPES = ["TCMatrix", "BalancedTrit", "TCType", "Hex4Tensor", "Hex4Node"];
 
-const HEX4_HEADERS = [
-  "hex4_nn_vm_types.h",
-  "hex4_nn_compiler.h",
-  "hex4_nn_vm.h",
-  "hex4_sm2.h",
-  "hex4_balanced_ops.h",
-];
+const HEX4_HEADERS = ["hex4_nn_vm_types.h", "hex4_nn_compiler.h", "hex4_nn_vm.h", "hex4_sm2.h", "hex4_balanced_ops.h"];
 
-function getHex4Completions(
-  textBefore: string,
-): vscode.InlineCompletionItem[] | null {
+function getHex4Completions(textBefore: string): vscode.InlineCompletionItem[] | null {
   const items: vscode.InlineCompletionItem[] = [];
 
   // Prefix-based completions
@@ -69,9 +50,7 @@ function getHex4Completions(
   if (lastWord.length >= 2) {
     for (const t of HEX4_STRUCT_TYPES) {
       if (t.toLowerCase().startsWith(lastWord.toLowerCase())) {
-        items.push(
-          new vscode.InlineCompletionItem(t.substring(lastWord.length)),
-        );
+        items.push(new vscode.InlineCompletionItem(t.substring(lastWord.length)));
       }
     }
     if (items.length > 0) return items;
@@ -82,9 +61,7 @@ function getHex4Completions(
   if (includeMatch) {
     for (const h of HEX4_HEADERS) {
       if (h.startsWith(includeMatch[1])) {
-        items.push(
-          new vscode.InlineCompletionItem(h.substring(includeMatch[1].length)),
-        );
+        items.push(new vscode.InlineCompletionItem(h.substring(includeMatch[1].length)));
       }
     }
     if (items.length > 0) return items;
@@ -119,12 +96,7 @@ const LANGUAGE_HINTS: Record<string, string> = {
   scala: "Scala 3",
 };
 
-function buildGeneralPrompt(
-  languageId: string,
-  textBefore: string,
-  textAfter: string,
-  indentation: string,
-): string {
+function buildGeneralPrompt(languageId: string, textBefore: string, textAfter: string, indentation: string): string {
   const langHint = LANGUAGE_HINTS[languageId] || languageId;
   const beforeLines = textBefore.split("\n");
   const contextLines = beforeLines.slice(-8).join("\n");
@@ -165,9 +137,7 @@ const LOCAL_PATTERNS: Record<string, string[]> = {
   print: ["print(", 'print(f"', "print!("],
 };
 
-function getLocalCompletions(
-  textBefore: string,
-): vscode.InlineCompletionItem[] {
+function getLocalCompletions(textBefore: string): vscode.InlineCompletionItem[] {
   const items: vscode.InlineCompletionItem[] = [];
   const trimmed = (textBefore.split("\n").pop() || "").trim();
   const indentation = textBefore.match(/(\s*)$/)?.[1] || "";
@@ -175,21 +145,14 @@ function getLocalCompletions(
   for (const [prefix, suggestions] of Object.entries(LOCAL_PATTERNS)) {
     if (trimmed.endsWith(prefix)) {
       for (const s of suggestions) {
-        items.push(
-          new vscode.InlineCompletionItem(
-            s.startsWith(prefix) ? s.slice(prefix.length) : s,
-          ),
-        );
+        items.push(new vscode.InlineCompletionItem(s.startsWith(prefix) ? s.slice(prefix.length) : s));
       }
       return items;
     }
   }
 
   // Bracket matching
-  if (trimmed.endsWith("{"))
-    items.push(
-      new vscode.InlineCompletionItem(`\n${indentation}  \n${indentation}}`),
-    );
+  if (trimmed.endsWith("{")) items.push(new vscode.InlineCompletionItem(`\n${indentation}  \n${indentation}}`));
   if (trimmed.endsWith("(")) items.push(new vscode.InlineCompletionItem(")"));
   if (trimmed.endsWith("[")) items.push(new vscode.InlineCompletionItem("]"));
 
@@ -198,9 +161,7 @@ function getLocalCompletions(
 
 // ── Unified Provider ─────────────────────────────────────────────────
 
-export class UnifiedCompletionProvider
-  implements vscode.InlineCompletionItemProvider, vscode.Disposable
-{
+export class UnifiedCompletionProvider implements vscode.InlineCompletionItemProvider, vscode.Disposable {
   private openaiClient: OpenAI | null = null;
   private model: string = COMPLETION_CONFIG.model;
   private baseURL: string = "";
@@ -216,53 +177,36 @@ export class UnifiedCompletionProvider
       const os = require("os");
       const path = require("path");
       const fs = require("fs");
-      const settingsPath = path.join(
-        os.homedir(),
-        ".hex4code",
-        "settings.json",
-      );
+      const settingsPath = path.join(os.homedir(), ".hex4code", "settings.json");
       let settings: Record<string, unknown> = {};
       if (fs.existsSync(settingsPath)) {
         const raw = fs.readFileSync(settingsPath, "utf8");
         settings = JSON.parse(raw);
       }
 
-      // Use multi-model routing to select completion model
+      // Use multi-model routing to select the completion model
       const settingsEnv =
-        settings.env &&
-        typeof settings.env === "object" &&
-        !Array.isArray(settings.env)
+        settings.env && typeof settings.env === "object" && !Array.isArray(settings.env)
           ? (settings.env as Record<string, string | undefined>)
           : {};
       const route = resolveProviderRoute("completion", {
         model: typeof settings.model === "string" ? settings.model : undefined,
         routing:
-          settings.taskModels &&
-          typeof settings.taskModels === "object" &&
-          !Array.isArray(settings.taskModels)
+          settings.taskModels && typeof settings.taskModels === "object" && !Array.isArray(settings.taskModels)
             ? (settings.taskModels as Record<string, string>)
             : undefined,
         env: {
           ...settingsEnv,
-          API_KEY:
-            typeof settings.apiKey === "string"
-              ? settings.apiKey
-              : settingsEnv.API_KEY,
+          API_KEY: typeof settings.apiKey === "string" ? settings.apiKey : settingsEnv.API_KEY,
         },
         providers:
-          settings.providers &&
-          typeof settings.providers === "object" &&
-          !Array.isArray(settings.providers)
+          settings.providers && typeof settings.providers === "object" && !Array.isArray(settings.providers)
             ? (settings.providers as any)
             : undefined,
         legacyApiKeyProvider:
-          typeof settings.legacyApiKeyProvider === "string"
-            ? (settings.legacyApiKeyProvider as any)
-            : undefined,
+          typeof settings.legacyApiKeyProvider === "string" ? (settings.legacyApiKeyProvider as any) : undefined,
         legacyBaseURLProvider:
-          typeof settings.legacyBaseURLProvider === "string"
-            ? (settings.legacyBaseURLProvider as any)
-            : undefined,
+          typeof settings.legacyBaseURLProvider === "string" ? (settings.legacyBaseURLProvider as any) : undefined,
         processEnv: process.env,
       });
 
@@ -276,18 +220,14 @@ export class UnifiedCompletionProvider
         apiKey: this.apiKey,
         baseURL: this.baseURL,
       });
-      this.openaiClient =
-        client && "chat" in client ? (client as unknown as OpenAI) : null;
+      this.openaiClient = client && "chat" in client ? (client as unknown as OpenAI) : null;
     } catch {
       // routeTask 失败时，用 HEX4CODE_API_KEY 环境变量 + createClient 回退
       this.apiKey = process.env.HEX4CODE_API_KEY || "";
       if (this.apiKey) {
         try {
           const { createClient } = require("../models/provider-client");
-          const client = createClient({
-            modelId: COMPLETION_CONFIG.model,
-            apiKey: this.apiKey,
-          });
+          const client = createClient({ modelId: COMPLETION_CONFIG.model, apiKey: this.apiKey });
           if (client && "chat" in client) {
             this.openaiClient = client as unknown as OpenAI;
             this.baseURL = (client as any).baseURL || "";
@@ -348,11 +288,7 @@ export class UnifiedCompletionProvider
     }
 
     // ── Step 3: deepseek-v4 API general completion ───────────────────
-    if (
-      this.openaiClient &&
-      !token.isCancellationRequested &&
-      trimmedBefore.length >= 2
-    ) {
+    if (this.openaiClient && !token.isCancellationRequested && trimmedBefore.length >= 2) {
       try {
         const textAfter = line.text.substring(position.character);
         const indentation = line.text.match(/^\s*/)?.[0] || "";
@@ -362,12 +298,7 @@ export class UnifiedCompletionProvider
           messages: [
             {
               role: "user",
-              content: buildGeneralPrompt(
-                languageId,
-                textBefore,
-                textAfter,
-                indentation,
-              ),
+              content: buildGeneralPrompt(languageId, textBefore, textAfter, indentation),
             },
           ],
           max_tokens: COMPLETION_CONFIG.maxTokens,

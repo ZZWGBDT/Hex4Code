@@ -59,10 +59,14 @@ export function MessageView({
           </Box>
         );
       }
+      const reasoningContent = extractReasoningContent(message.messageParams);
       return (
         <Box marginLeft={1} flexDirection="column" marginY={0}>
           <StatusLine bulletColor="gray" name="Thinking" params={summary} />
           <Box flexDirection="column" marginLeft={4}>
+            {reasoningContent ? (
+              <Text dimColor>{renderMarkdown(reasoningContent)}</Text>
+            ) : null}
             {content ? <Text dimColor>{renderMarkdown(content)}</Text> : null}
           </Box>
         </Box>
@@ -71,6 +75,7 @@ export function MessageView({
 
     const containerWidth = Math.max(1, width - 2);
     const contentWidth = Math.max(1, width - 4);
+    const reasoningContent = extractReasoningContent(message.messageParams);
 
     return (
       <Box
@@ -84,7 +89,12 @@ export function MessageView({
         <Box alignSelf="stretch">
           <Text color={CLI_THEME.accentStrong}>✦</Text>
         </Box>
-        <Box flexGrow={1} width={contentWidth}>
+        <Box flexGrow={1} width={contentWidth} flexDirection="column">
+          {reasoningContent && !isThinking ? (
+            <Text dimColor wrap="wrap">
+              {renderMarkdown(reasoningContent)}
+            </Text>
+          ) : null}
           {content ? <Text wrap="wrap">{renderMarkdown(content)}</Text> : null}
         </Box>
       </Box>
@@ -429,8 +439,19 @@ function buildThinkingSummary(
     typeof params?.reasoning_content === "string" &&
     params.reasoning_content.trim()
   ) {
-    return "(reasoning...)";
+    const normalized = params.reasoning_content
+      .replace(/\r?\n/g, " ")
+      .replace(/\s+/g, " ");
+    return truncate(normalized, 100);
   }
 
   return "";
+}
+
+function extractReasoningContent(messageParams: unknown | null): string {
+  if (!messageParams || typeof messageParams !== "object") return "";
+  const params = messageParams as { reasoning_content?: unknown };
+  return typeof params.reasoning_content === "string"
+    ? params.reasoning_content
+    : "";
 }

@@ -2,17 +2,14 @@
 /// @brief Session system — message construction and tool pairing (extracted from session.ts)
 ///
 /// Pure function collection: does not depend on SessionManager instance state.
-/// Functions requiring projectRoot receive it as a parameter.
+/// Functions that need projectRoot receive it as a parameter.
 
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
 import * as crypto from "crypto";
 import ejs from "ejs";
-import type {
-  ChatCompletionMessageParam,
-  ChatCompletionContentPart,
-} from "openai/resources/chat/completions";
+import type { ChatCompletionMessageParam, ChatCompletionContentPart } from "openai/resources/chat/completions";
 import { supportsMultimodal } from "./common/model-capabilities";
 import {
   getExtensionRoot,
@@ -24,13 +21,10 @@ import {
 } from "./session-types";
 
 // ═══════════════════════════════════════════════════════════════
-// I. Message factories (pure functions)
+// I. Message Factory (pure functions)
 // ═══════════════════════════════════════════════════════════════
 
-export function buildUserMessage(
-  sessionId: string,
-  prompt: UserPromptContent,
-): SessionMessage {
+export function buildUserMessage(sessionId: string, prompt: UserPromptContent): SessionMessage {
   const now = new Date().toISOString();
   const imageParams =
     prompt.imageUrls
@@ -76,11 +70,7 @@ export function buildSystemMessage(
   };
 }
 
-export function buildSkillMessage(
-  sessionId: string,
-  content: string,
-  skill: SkillInfo,
-): SessionMessage {
+export function buildSkillMessage(sessionId: string, content: string, skill: SkillInfo): SessionMessage {
   const now = new Date().toISOString();
   return {
     id: crypto.randomUUID(),
@@ -105,10 +95,8 @@ export function buildAssistantMessage(
 ): SessionMessage {
   const now = new Date().toISOString();
   const hasReasoningContent = reasoningContent != null;
-  const messageParams: {
-    tool_calls?: unknown[];
-    reasoning_content?: string;
-  } | null = toolCalls || hasReasoningContent ? {} : null;
+  const messageParams: { tool_calls?: unknown[]; reasoning_content?: string } | null =
+    toolCalls || hasReasoningContent ? {} : null;
   if (toolCalls) {
     messageParams!.tool_calls = toolCalls;
   }
@@ -126,15 +114,12 @@ export function buildAssistantMessage(
     visible: (content || reasoningContent || "").trim() ? true : false,
     createTime: now,
     updateTime: now,
-    meta:
-      toolCalls || (hasReasoningContent && !(content || "").trim())
-        ? { asThinking: true }
-        : undefined,
+    meta: (toolCalls || (hasReasoningContent && !(content || "").trim())) ? { asThinking: true } : undefined,
   };
 }
 
 // ═══════════════════════════════════════════════════════════════
-// II. Agent instruction loading
+// II. Agent Instruction Loading
 // ═══════════════════════════════════════════════════════════════
 
 export function readNonEmptyFile(filePath: string): string | null {
@@ -147,9 +132,7 @@ export function readNonEmptyFile(filePath: string): string | null {
   }
 }
 
-export function loadProjectAgentInstructions(
-  projectRoot: string,
-): { content: string; displayPath: string } | null {
+export function loadProjectAgentInstructions(projectRoot: string): { content: string; displayPath: string } | null {
   const candidatePaths = [
     {
       absolutePath: path.join(projectRoot, ".hex4code", "AGENTS.md"),
@@ -169,9 +152,7 @@ export function loadProjectAgentInstructions(
   return null;
 }
 
-export function getEffectiveProjectAgentsMdFile(
-  projectRoot: string,
-): string | null {
+export function getEffectiveProjectAgentsMdFile(projectRoot: string): string | null {
   return loadProjectAgentInstructions(projectRoot)?.displayPath ?? null;
 }
 
@@ -182,12 +163,7 @@ export function loadAgentInstructions(projectRoot: string): string | null {
 }
 
 export function renderInitCommandPrompt(projectRoot: string): string {
-  const templatePath = path.join(
-    getExtensionRoot(),
-    "templates",
-    "prompts",
-    "init_command.md.ejs",
-  );
+  const templatePath = path.join(getExtensionRoot(), "templates", "prompts", "init_command.md.ejs");
   const template = fs.readFileSync(templatePath, "utf8");
   return ejs.render(template, {
     agentsMdFile: getEffectiveProjectAgentsMdFile(projectRoot),
@@ -195,17 +171,12 @@ export function renderInitCommandPrompt(projectRoot: string): string {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// III. Tool messages and pairing
+// III. Tool Messages and Pairing
 // ═══════════════════════════════════════════════════════════════
 
-export function buildInterruptedToolResult(
-  toolFunction: unknown | null,
-  reason: string,
-): string {
+export function buildInterruptedToolResult(toolFunction: unknown | null, reason: string): string {
   const toolName =
-    toolFunction &&
-    typeof toolFunction === "object" &&
-    typeof (toolFunction as { name?: unknown }).name === "string"
+    toolFunction && typeof toolFunction === "object" && typeof (toolFunction as { name?: unknown }).name === "string"
       ? (toolFunction as { name: string }).name
       : "tool";
   return JSON.stringify(
@@ -227,22 +198,15 @@ export function buildInterruptedOpenAIToolMessage(
   const toolFunction = findToolFunction(toolCalls, toolCallId);
   return {
     role: "tool",
-    content: buildInterruptedToolResult(
-      toolFunction,
-      "Previous tool call did not complete.",
-    ),
+    content: buildInterruptedToolResult(toolFunction, "Previous tool call did not complete."),
     tool_call_id: toolCallId,
   } as ChatCompletionMessageParam;
 }
 
 export function getAssistantToolCalls(message: SessionMessage): unknown[] {
   if (message.role !== "assistant") return [];
-  const messageParams = message.messageParams as {
-    tool_calls?: unknown[];
-  } | null;
-  return Array.isArray(messageParams?.tool_calls)
-    ? messageParams.tool_calls
-    : [];
+  const messageParams = message.messageParams as { tool_calls?: unknown[] } | null;
+  return Array.isArray(messageParams?.tool_calls) ? messageParams.tool_calls : [];
 }
 
 export function getToolCallId(toolCall: unknown): string | null {
@@ -252,37 +216,26 @@ export function getToolCallId(toolCall: unknown): string | null {
 }
 
 export function getToolMessageCallId(message: SessionMessage): string | null {
-  const messageParams = message.messageParams as {
-    tool_call_id?: unknown;
-  } | null;
+  const messageParams = message.messageParams as { tool_call_id?: unknown } | null;
   const toolCallId = messageParams?.tool_call_id;
   return typeof toolCallId === "string" && toolCallId ? toolCallId : null;
 }
 
-export function buildToolPairingKey(
-  assistantIndex: number,
-  toolCallIndex: number,
-): string {
+export function buildToolPairingKey(assistantIndex: number, toolCallIndex: number): string {
   return `${assistantIndex}:${toolCallIndex}`;
 }
 
 export function isInterruptedToolMessage(message: SessionMessage): boolean {
-  if (typeof message.content !== "string" || !message.content.trim())
-    return false;
+  if (typeof message.content !== "string" || !message.content.trim()) return false;
   try {
-    const parsed = JSON.parse(message.content) as {
-      metadata?: { interrupted?: unknown };
-    };
+    const parsed = JSON.parse(message.content) as { metadata?: { interrupted?: unknown } };
     return parsed.metadata?.interrupted === true;
   } catch {
     return false;
   }
 }
 
-export function findToolFunction(
-  toolCalls: unknown[],
-  toolCallId: string,
-): unknown | null {
+export function findToolFunction(toolCalls: unknown[], toolCallId: string): unknown | null {
   for (const toolCall of toolCalls) {
     if (!toolCall || typeof toolCall !== "object") continue;
     const record = toolCall as { id?: unknown; function?: unknown };
@@ -293,10 +246,7 @@ export function findToolFunction(
   return null;
 }
 
-export function formatToolResultSnippet(
-  value: string,
-  maxLength: number,
-): string {
+export function formatToolResultSnippet(value: string, maxLength: number): string {
   if (value.length <= maxLength) return value;
   return `${value.slice(0, maxLength)}... (total ${value.length} chars)`;
 }
@@ -326,8 +276,7 @@ export function formatToolParamsSnippet(
 ): string {
   if (toolName === "bash") {
     const command = typeof args.command === "string" ? args.command.trim() : "";
-    const description =
-      typeof args.description === "string" ? args.description.trim() : "";
+    const description = typeof args.description === "string" ? args.description.trim() : "";
     if (command && description) return `${command}  # ${description}`;
     if (command) return command;
     if (description) return description;
@@ -342,10 +291,7 @@ export function formatToolParamsSnippet(
   return text;
 }
 
-export function buildToolParamsSnippet(
-  toolFunction: unknown | null,
-  projectRoot: string,
-): string {
+export function buildToolParamsSnippet(toolFunction: unknown | null, projectRoot: string): string {
   if (!toolFunction || typeof toolFunction !== "object") return "";
   const args = (toolFunction as { arguments?: unknown }).arguments;
   const toolName = (toolFunction as { name?: unknown }).name;
@@ -362,9 +308,7 @@ export function buildToolParamsSnippet(
       );
     }
   } catch {
-    console.debug(
-      "[session] cannot parse structured message, fall back to raw",
-    );
+    console.debug("[session] cannot parse structured message, fall back to raw");
   }
   return trimmed;
 }
@@ -380,7 +324,7 @@ export function isInvisibleExecution(content: string): boolean {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// IV. Tool message construction
+// IV. 工具消息构建
 // ═══════════════════════════════════════════════════════════════
 
 export function buildToolMessage(
@@ -414,7 +358,7 @@ export function buildToolMessage(
 }
 
 // ═══════════════════════════════════════════════════════════════
-// V. Tool message pairing
+// V. 工具消息配对
 // ═══════════════════════════════════════════════════════════════
 
 export function findPairableToolMessageIndex(
@@ -435,49 +379,28 @@ export function findPairableToolMessageIndex(
   return firstMatchingIndex;
 }
 
-export function pairToolMessages(
-  messages: SessionMessage[],
-): Map<string, number> {
+export function pairToolMessages(messages: SessionMessage[]): Map<string, number> {
   const pairings = new Map<string, number>();
   const usedToolMessageIndexes = new Set<number>();
-  for (
-    let assistantIndex = 0;
-    assistantIndex < messages.length;
-    assistantIndex += 1
-  ) {
+  for (let assistantIndex = 0; assistantIndex < messages.length; assistantIndex += 1) {
     const toolCalls = getAssistantToolCalls(messages[assistantIndex]);
-    for (
-      let toolCallIndex = 0;
-      toolCallIndex < toolCalls.length;
-      toolCallIndex += 1
-    ) {
+    for (let toolCallIndex = 0; toolCallIndex < toolCalls.length; toolCallIndex += 1) {
       const toolCallId = getToolCallId(toolCalls[toolCallIndex]);
       if (!toolCallId) continue;
-      const toolIndex = findPairableToolMessageIndex(
-        messages,
-        assistantIndex,
-        toolCallId,
-        usedToolMessageIndexes,
-      );
+      const toolIndex = findPairableToolMessageIndex(messages, assistantIndex, toolCallId, usedToolMessageIndexes);
       if (toolIndex == null) continue;
       usedToolMessageIndexes.add(toolIndex);
-      pairings.set(
-        buildToolPairingKey(assistantIndex, toolCallIndex),
-        toolIndex,
-      );
+      pairings.set(buildToolPairingKey(assistantIndex, toolCallIndex), toolIndex);
     }
   }
   return pairings;
 }
 
 // ═══════════════════════════════════════════════════════════════
-// VI. OpenAI message conversion
+// VI. OpenAI 消息转换
 // ═══════════════════════════════════════════════════════════════
 
-export function renderOpenAIMessageContent(
-  message: SessionMessage,
-  projectRoot: string,
-): string {
+export function renderOpenAIMessageContent(message: SessionMessage, projectRoot: string): string {
   if (message.role === "user" && message.content === "/init") {
     return renderInitCommandPrompt(projectRoot);
   }
@@ -497,46 +420,33 @@ export function sessionMessageToOpenAIMessage(
   } as ChatCompletionMessageParam;
 
   const messageParams = message.messageParams as
-    | {
-        tool_calls?: unknown[];
-        tool_call_id?: string;
-        reasoning_content?: string;
-      }
+    | { tool_calls?: unknown[]; tool_call_id?: string; reasoning_content?: string }
     | null
     | undefined;
   if (messageParams?.tool_calls) {
     (base as { tool_calls?: unknown[] }).tool_calls = messageParams.tool_calls;
   }
   if (messageParams?.tool_call_id) {
-    (base as { tool_call_id?: string }).tool_call_id =
-      messageParams.tool_call_id;
+    (base as { tool_call_id?: string }).tool_call_id = messageParams.tool_call_id;
   }
   if (typeof messageParams?.reasoning_content === "string") {
-    (base as { reasoning_content?: string }).reasoning_content =
-      messageParams.reasoning_content;
+    (base as { reasoning_content?: string }).reasoning_content = messageParams.reasoning_content;
   } else if (thinkingEnabled && message.role === "assistant") {
     (base as { reasoning_content?: string }).reasoning_content = "";
   }
 
-  if (
-    (message.role === "user" || message.role === "system") &&
-    message.contentParams
-  ) {
+  if ((message.role === "user" || message.role === "system") && message.contentParams) {
     const contentParts: ChatCompletionContentPart[] = [];
     if (content) contentParts.push({ type: "text", text: content });
-    const params = Array.isArray(message.contentParams)
-      ? message.contentParams
-      : [message.contentParams];
+    const params = Array.isArray(message.contentParams) ? message.contentParams : [message.contentParams];
     for (const param of params) {
       const part = param as ChatCompletionContentPart;
       if (part && (part.type !== "image_url" || supportsMultimodal(model))) {
         contentParts.push(part);
       }
     }
-    const contentValue: string | ChatCompletionContentPart[] =
-      contentParts.length > 0 ? contentParts : content;
-    (base as { content: string | ChatCompletionContentPart[] }).content =
-      contentValue;
+    const contentValue: string | ChatCompletionContentPart[] = contentParts.length > 0 ? contentParts : content;
+    (base as { content: string | ChatCompletionContentPart[] }).content = contentValue;
   }
 
   return base;
@@ -555,42 +465,22 @@ export function buildOpenAIMessages(
   for (let index = 0; index < activeMessages.length; index += 1) {
     const message = activeMessages[index];
     if (message.role === "tool") continue;
-    openAIMessages.push(
-      sessionMessageToOpenAIMessage(
-        message,
-        thinkingEnabled,
-        model,
-        projectRoot,
-      ),
-    );
+    openAIMessages.push(sessionMessageToOpenAIMessage(message, thinkingEnabled, model, projectRoot));
 
     const toolCalls = getAssistantToolCalls(message);
     if (toolCalls.length === 0) continue;
 
-    for (
-      let toolCallIndex = 0;
-      toolCallIndex < toolCalls.length;
-      toolCallIndex += 1
-    ) {
+    for (let toolCallIndex = 0; toolCallIndex < toolCalls.length; toolCallIndex += 1) {
       const toolCallId = getToolCallId(toolCalls[toolCallIndex]);
       if (!toolCallId) continue;
-      const pairedToolIndex = toolPairings.get(
-        buildToolPairingKey(index, toolCallIndex),
-      );
+      const pairedToolIndex = toolPairings.get(buildToolPairingKey(index, toolCallIndex));
       if (pairedToolIndex != null) {
         openAIMessages.push(
-          sessionMessageToOpenAIMessage(
-            activeMessages[pairedToolIndex],
-            thinkingEnabled,
-            model,
-            projectRoot,
-          ),
+          sessionMessageToOpenAIMessage(activeMessages[pairedToolIndex], thinkingEnabled, model, projectRoot),
         );
         continue;
       }
-      openAIMessages.push(
-        buildInterruptedOpenAIToolMessage(toolCalls, toolCallId),
-      );
+      openAIMessages.push(buildInterruptedOpenAIToolMessage(toolCalls, toolCallId));
     }
   }
 

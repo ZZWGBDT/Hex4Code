@@ -54,6 +54,7 @@ import type {
   ModelConfigSelection,
   ReasoningEffort,
 } from "@hex4code/core/settings";
+import { PROVIDERS } from "@hex4code/core/models/provider-registry";
 import DropdownMenu from "./DropdownMenu";
 
 export type PromptSubmission = {
@@ -80,10 +81,31 @@ type Props = {
 };
 
 const SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
-export const MODEL_COMMAND_MODELS = [
+/**
+ * Get all model IDs from all registered providers (without config filtering).
+ * Replaces the old hardcoded MODEL_COMMAND_MODELS.
+ */
+export function getAvailableModelIds(currentModel?: string): string[] {
+  const modelIds: string[] = [];
+  for (const provider of PROVIDERS) {
+    for (const model of provider.models) {
+      if (!modelIds.includes(model.id)) {
+        modelIds.push(model.id);
+      }
+    }
+  }
+  // Ensure the current model is always in the list (handles custom and dynamic models)
+  if (currentModel && !modelIds.includes(currentModel)) {
+    modelIds.push(currentModel);
+  }
+  return modelIds;
+}
+
+/** @deprecated Use getAvailableModelIds() to obtain dynamically */
+export const MODEL_COMMAND_MODELS: readonly string[] = Object.freeze([
   "deepseek-v4-pro",
   "deepseek-v4-flash",
-] as const;
+]);
 
 type ThinkingModeOption = {
   label: string;
@@ -164,6 +186,12 @@ export const PromptInput = React.memo(function PromptInput({
   const lastCtrlDAt = React.useRef<number>(0);
   const undoRedoRef = React.useRef(createPromptUndoRedoState());
 
+  // Dynamically compute the available model list (all supported models), must be defined before reference code
+  const availableModelIds = useMemo(
+    () => getAvailableModelIds(modelConfig.model),
+    [modelConfig.model],
+  );
+
   const slashItems = React.useMemo(() => buildSlashCommands(skills), [skills]);
   const slashToken = getCurrentSlashToken(buffer);
   const slashMenu = React.useMemo(
@@ -213,12 +241,12 @@ export const PromptInput = React.memo(function PromptInput({
     }
     const optionCount =
       modelDropdownStep === "model"
-        ? MODEL_COMMAND_MODELS.length
+        ? availableModelIds.length
         : MODEL_COMMAND_THINKING_OPTIONS.length;
     if (modelDropdownIndex >= optionCount) {
       setModelDropdownIndex(Math.max(0, optionCount - 1));
     }
-  }, [modelDropdownIndex, modelDropdownStep]);
+  }, [modelDropdownIndex, modelDropdownStep, availableModelIds.length]);
 
   useEffect(() => {
     if (!statusMessage) {
@@ -335,7 +363,7 @@ export const PromptInput = React.memo(function PromptInput({
       if (modelDropdownStep) {
         const optionCount =
           modelDropdownStep === "model"
-            ? MODEL_COMMAND_MODELS.length
+            ? availableModelIds.length
             : MODEL_COMMAND_THINKING_OPTIONS.length;
         if (key.upArrow) {
           setModelDropdownIndex((idx) => (idx - 1 + optionCount) % optionCount);
@@ -769,7 +797,7 @@ export const PromptInput = React.memo(function PromptInput({
   }
 
   function openModelDropdown(): void {
-    const currentModelIndex = MODEL_COMMAND_MODELS.findIndex(
+    const currentModelIndex = availableModelIds.findIndex(
       (model) => model === modelConfig.model,
     );
     setPendingModel(null);
@@ -785,8 +813,7 @@ export const PromptInput = React.memo(function PromptInput({
 
   function selectModelDropdownItem(): void {
     if (modelDropdownStep === "model") {
-      const model =
-        MODEL_COMMAND_MODELS[modelDropdownIndex] ?? modelConfig.model;
+      const model = availableModelIds[modelDropdownIndex] ?? modelConfig.model;
       setPendingModel(model);
       setModelDropdownStep("thinking");
       setModelDropdownIndex(getThinkingOptionIndex(modelConfig));
@@ -816,7 +843,7 @@ export const PromptInput = React.memo(function PromptInput({
 
   const modelDropdownItems =
     modelDropdownStep === "model"
-      ? MODEL_COMMAND_MODELS.map((model) => ({
+      ? availableModelIds.map((model) => ({
           label: model,
           selected: model === (pendingModel ?? modelConfig.model),
           description: model === modelConfig.model ? "current model" : "",

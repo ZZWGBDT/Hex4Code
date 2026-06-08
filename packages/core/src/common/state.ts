@@ -29,20 +29,12 @@ const snippetsBySession = new Map<string, Map<string, FileSnippet>>();
 const snippetCountersBySession = new Map<string, number>();
 const fileVersionsBySession = new Map<string, Map<string, number>>();
 
-export function normalizeFilePath(
-  filePath: string,
-  platform: NodeJS.Platform = process.platform,
-): string {
+export function normalizeFilePath(filePath: string, platform: NodeJS.Platform = process.platform): string {
   const nativePath = normalizeNativeFilePath(filePath, platform);
-  return platform === "win32"
-    ? path.win32.normalize(nativePath)
-    : path.normalize(nativePath);
+  return platform === "win32" ? path.win32.normalize(nativePath) : path.normalize(nativePath);
 }
 
-export function normalizeNativeFilePath(
-  filePath: string,
-  platform: NodeJS.Platform = process.platform,
-): string {
+export function normalizeNativeFilePath(filePath: string, platform: NodeJS.Platform = process.platform): string {
   if (platform !== "win32") {
     return filePath;
   }
@@ -54,27 +46,18 @@ export function normalizeNativeFilePath(
   return filePath;
 }
 
-export function isAbsoluteFilePath(
-  filePath: string,
-  platform: NodeJS.Platform = process.platform,
-): boolean {
+export function isAbsoluteFilePath(filePath: string, platform: NodeJS.Platform = process.platform): boolean {
   const nativePath = normalizeNativeFilePath(filePath, platform);
   if (platform !== "win32") {
     return path.isAbsolute(nativePath);
   }
 
   const normalized = path.win32.normalize(nativePath);
-  return (
-    path.win32.isAbsolute(normalized) &&
-    (/^[A-Za-z]:[\\/]/.test(normalized) || /^\\\\/.test(normalized))
-  );
+  return path.win32.isAbsolute(normalized) && (/^[A-Za-z]:[\\/]/.test(normalized) || /^\\\\/.test(normalized));
 }
 
 function isGitBashAbsolutePath(filePath: string): boolean {
-  return (
-    /^\/[A-Za-z](?:\/|$)/.test(filePath) ||
-    /^\/cygdrive\/[A-Za-z](?:\/|$)/.test(filePath)
-  );
+  return /^\/[A-Za-z](?:\/|$)/.test(filePath) || /^\/cygdrive\/[A-Za-z](?:\/|$)/.test(filePath);
 }
 
 export function recordFileState(
@@ -94,9 +77,7 @@ export function recordFileState(
 
   const normalizedPath = normalizeFilePath(state.filePath);
   const currentVersion = getFileVersion(sessionId, normalizedPath);
-  const nextVersion = options.incrementVersion
-    ? currentVersion + 1
-    : currentVersion;
+  const nextVersion = options.incrementVersion ? currentVersion + 1 : currentVersion;
   setFileVersion(sessionId, normalizedPath, nextVersion);
   sessionState.set(normalizedPath, {
     ...state,
@@ -126,17 +107,12 @@ export function markFileRead(
   });
 }
 
-export function getFileState(
-  sessionId: string,
-  filePath: string,
-): FileState | null {
+export function getFileState(sessionId: string, filePath: string): FileState | null {
   if (!sessionId || !filePath) {
     return null;
   }
 
-  return (
-    fileStatesBySession.get(sessionId)?.get(normalizeFilePath(filePath)) ?? null
-  );
+  return fileStatesBySession.get(sessionId)?.get(normalizeFilePath(filePath)) ?? null;
 }
 
 export function wasFileRead(sessionId: string, filePath: string): boolean {
@@ -147,16 +123,10 @@ export function getFileVersion(sessionId: string, filePath: string): number {
   if (!sessionId || !filePath) {
     return 0;
   }
-  return (
-    fileVersionsBySession.get(sessionId)?.get(normalizeFilePath(filePath)) ?? 0
-  );
+  return fileVersionsBySession.get(sessionId)?.get(normalizeFilePath(filePath)) ?? 0;
 }
 
-function setFileVersion(
-  sessionId: string,
-  filePath: string,
-  version: number,
-): void {
+function setFileVersion(sessionId: string, filePath: string, version: number): void {
   let sessionVersions = fileVersionsBySession.get(sessionId);
   if (!sessionVersions) {
     sessionVersions = new Map<string, number>();
@@ -167,10 +137,7 @@ function setFileVersion(
 
 export function isFullFileView(state: FileState | null): boolean {
   return Boolean(
-    state &&
-    !state.isPartialView &&
-    typeof state.offset === "undefined" &&
-    typeof state.limit === "undefined",
+    state && !state.isPartialView && typeof state.offset === "undefined" && typeof state.limit === "undefined",
   );
 }
 
@@ -206,19 +173,13 @@ export function createSnippet(
   return snippet;
 }
 
-export function getSnippet(
-  sessionId: string,
-  snippetId: string,
-): FileSnippet | null {
+export function getSnippet(sessionId: string, snippetId: string): FileSnippet | null {
   if (!sessionId || !snippetId) {
     return null;
   }
   return snippetsBySession.get(sessionId)?.get(snippetId) ?? null;
 }
 
-export function hasSnippetOutdatedFileVersion(
-  sessionId: string,
-  snippet: FileSnippet,
-): boolean {
+export function hasSnippetOutdatedFileVersion(sessionId: string, snippet: FileSnippet): boolean {
   return getFileVersion(sessionId, snippet.filePath) > snippet.fileVersion;
 }

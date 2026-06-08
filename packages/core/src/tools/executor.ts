@@ -84,10 +84,7 @@ export function mergeTC(states: TCType[]): TCType {
 }
 
 /** Prepend upstream TC links to a tool result's chain and recompute its composite tcState. */
-export function propagateTC(
-  result: ToolExecutionResult,
-  upstreamChain: TCLink[],
-): ToolExecutionResult {
+export function propagateTC(result: ToolExecutionResult, upstreamChain: TCLink[]): ToolExecutionResult {
   if (upstreamChain.length === 0) return result;
   const allStates: TCType[] = [...upstreamChain.map((l) => l.tc)];
   if (result.tcState) allStates.push(result.tcState);
@@ -135,11 +132,7 @@ export class ToolExecutor {
   private readonly mcpManager?: McpManager;
   private readonly toolHandlers = new Map<string, ToolHandler>();
 
-  constructor(
-    projectRoot: string,
-    createOpenAIClient?: CreateOpenAIClient,
-    mcpManager?: McpManager,
-  ) {
+  constructor(projectRoot: string, createOpenAIClient?: CreateOpenAIClient, mcpManager?: McpManager) {
     this.projectRoot = projectRoot;
     this.createOpenAIClient = createOpenAIClient;
     this.mcpManager = mcpManager;
@@ -159,18 +152,12 @@ export class ToolExecutor {
 
     // Group independent calls for parallel execution
     const readToolNames = new Set(["read", "codeIndex"]);
-    const allReads = parsedCalls.filter((c) =>
-      readToolNames.has(c.function.name),
-    );
-    const others = parsedCalls.filter(
-      (c) => !readToolNames.has(c.function.name),
-    );
+    const allReads = parsedCalls.filter((c) => readToolNames.has(c.function.name));
+    const others = parsedCalls.filter((c) => !readToolNames.has(c.function.name));
 
     // Run independent read/codeIndex calls in parallel
     if (allReads.length > 1) {
-      const results = await Promise.allSettled(
-        allReads.map((tc) => this.executeToolCall(sessionId, tc, hooks)),
-      );
+      const results = await Promise.allSettled(allReads.map((tc) => this.executeToolCall(sessionId, tc, hooks)));
       for (let i = 0; i < allReads.length; i++) {
         const r = results[i];
         executions.push({
@@ -178,27 +165,16 @@ export class ToolExecutor {
           content:
             r.status === "fulfilled"
               ? this.formatToolResult(r.value)
-              : JSON.stringify({
-                  ok: false,
-                  error: r.reason?.message || String(r.reason),
-                }),
+              : JSON.stringify({ ok: false, error: r.reason?.message || String(r.reason) }),
           result:
             r.status === "fulfilled"
               ? r.value
-              : {
-                  ok: false,
-                  name: allReads[i].function.name,
-                  error: r.reason?.message || String(r.reason),
-                },
+              : { ok: false, name: allReads[i].function.name, error: r.reason?.message || String(r.reason) },
         });
       }
     } else if (allReads.length === 1) {
       const result = await this.executeToolCall(sessionId, allReads[0], hooks);
-      executions.push({
-        toolCallId: allReads[0].id,
-        content: this.formatToolResult(result),
-        result,
-      });
+      executions.push({ toolCallId: allReads[0].id, content: this.formatToolResult(result), result });
     }
 
     // ── TC propagation chain for serial calls ────────────────────────
@@ -211,16 +187,9 @@ export class ToolExecutor {
       const propagated = propagateTC(rawResult, turnChain);
       // Accumulate this step's TC for subsequent serial calls
       if (propagated.tcState && propagated.tcState !== "TC_NONE") {
-        turnChain.push({
-          source: toolCall.function.name,
-          tc: propagated.tcState,
-        });
+        turnChain.push({ source: toolCall.function.name, tc: propagated.tcState });
       }
-      executions.push({
-        toolCallId: toolCall.id,
-        content: this.formatToolResult(propagated),
-        result: propagated,
-      });
+      executions.push({ toolCallId: toolCall.id, content: this.formatToolResult(propagated), result: propagated });
       if (hooks?.shouldStop?.()) break;
     }
 
@@ -229,8 +198,7 @@ export class ToolExecutor {
     for (const exec of executions) {
       if (exec.result.tcState) allTcStates.push(exec.result.tcState);
     }
-    const turnTcState =
-      allTcStates.length > 0 ? mergeTC(allTcStates) : undefined;
+    const turnTcState = allTcStates.length > 0 ? mergeTC(allTcStates) : undefined;
     (executions as any)._tcSummary = { turnTcState, chain: turnChain };
 
     // ── Pipeline detection ─────────────────────────────────────────────
@@ -244,10 +212,7 @@ export class ToolExecutor {
       const pipelineSummary = buildPipelineSummary(pipeline);
       (executions as any)._pipelineSummary = pipelineSummary;
       if (pipelineTcCtx.length > 0) {
-        (executions as any)._tcSummary.chain = [
-          ...((executions as any)._tcSummary.chain || []),
-          ...pipelineTcCtx,
-        ];
+        (executions as any)._tcSummary.chain = [...((executions as any)._tcSummary.chain || []), ...pipelineTcCtx];
       }
     }
 
@@ -291,10 +256,7 @@ export class ToolExecutor {
       return null;
     }
 
-    const rawArguments =
-      typeof functionRecord.arguments === "string"
-        ? functionRecord.arguments
-        : "";
+    const rawArguments = typeof functionRecord.arguments === "string" ? functionRecord.arguments : "";
 
     return {
       id: record.id,
@@ -373,9 +335,7 @@ export class ToolExecutor {
 
   private parseToolArguments(
     rawArguments: string,
-  ):
-    | { ok: true; args: Record<string, unknown> }
-    | { ok: false; error: string } {
+  ): { ok: true; args: Record<string, unknown> } | { ok: false; error: string } {
     if (!rawArguments) {
       return { ok: true, args: {} };
     }
@@ -383,10 +343,7 @@ export class ToolExecutor {
     try {
       const parsed = JSON.parse(rawArguments);
       if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-        return {
-          ok: false,
-          error: "InputParseError: Tool arguments must be a JSON object.",
-        };
+        return { ok: false, error: "InputParseError: Tool arguments must be a JSON object." };
       }
       return { ok: true, args: parsed as Record<string, unknown> };
     } catch (error) {

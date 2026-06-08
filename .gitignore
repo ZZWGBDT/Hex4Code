@@ -1,3 +1,7 @@
 node_modules/
 packages/cli/dist/
 vscode/out/
+vscode/*.vsix
+.hex4code/
+*.js.map
+session-*.md

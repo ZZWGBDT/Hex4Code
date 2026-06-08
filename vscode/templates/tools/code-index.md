@@ -11,7 +11,7 @@ Key benefits over bash+grep:
 Usage:
 - `codeIndex({query: "tc_propagate"})` — fuzzy find all symbols containing "tc_propagate"
 - `codeIndex({query: "TCState", type: "struct"})` — find struct definitions only
-- `codeIndex({query: "hex4_ternary", project: "HEX4"})` — limit to a project
+- `codeIndex({query: "hex4_ternary", project: "HEX4密码"})` — limit to a project
 - `codeIndex({query: "H4_OK", type: "macro"})` — find macro definitions
 
 ```json

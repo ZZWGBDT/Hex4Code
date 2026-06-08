@@ -1,6 +1,6 @@
 {
   "name": "@hex4code/core",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Hex4Code Core — shared session, prompt, tools, models, cache, and orchestration",
   "license": "Apache-2.0",
   "repository": {
@@ -11,9 +11,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "npm run typecheck",
-    "test": "echo '⚠ No test files yet — see CONTRIBUTING.md for how to add tests'",
-    "typecheck": "npx tsc --noEmit"
+    "test": "echo 'Info: Test suite removed before open source release'",
+    "typecheck": "npx tsc --noEmit",
+    "build": "npm run typecheck"
   },
   "dependencies": {
     "ejs": "^5.0.2",

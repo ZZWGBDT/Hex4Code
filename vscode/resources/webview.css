@@ -432,6 +432,132 @@ body {
   background: var(--vscode-list-hoverBackground);
 }
 
+.custom-provider-modal {
+  position: fixed;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 20000;
+}
+
+.custom-provider-modal.show {
+  display: flex;
+}
+
+.custom-provider-panel {
+  width: min(520px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--vscode-sideBar-background);
+  color: var(--vscode-foreground);
+  box-shadow: 0 12px 32px var(--shadow);
+}
+
+.custom-provider-header,
+.custom-provider-footer,
+.custom-provider-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.custom-provider-header {
+  justify-content: space-between;
+}
+
+.custom-provider-title {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.custom-provider-subtitle,
+.custom-provider-status {
+  color: var(--vscode-descriptionForeground);
+  font-size: 11px;
+}
+
+.custom-provider-close {
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--vscode-foreground);
+  cursor: pointer;
+  font-size: 20px;
+  line-height: 1;
+}
+
+.custom-provider-close:hover {
+  background: var(--vscode-toolbar-hoverBackground);
+}
+
+.custom-provider-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.custom-provider-field input,
+.custom-provider-field select {
+  width: 100%;
+  min-height: 30px;
+  padding: 5px 8px;
+  border: 1px solid var(--vscode-input-border, var(--border-color));
+  border-radius: 5px;
+  background: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+  font: inherit;
+  outline: none;
+}
+
+.custom-provider-field input:focus,
+.custom-provider-field select:focus {
+  border-color: var(--vscode-focusBorder);
+}
+
+.custom-provider-actions {
+  justify-content: flex-start;
+}
+
+.custom-provider-actions button,
+.custom-provider-footer button {
+  min-height: 30px;
+  padding: 5px 10px;
+  border: 1px solid var(--vscode-button-border, transparent);
+  border-radius: 5px;
+  background: var(--vscode-button-secondaryBackground);
+  color: var(--vscode-button-secondaryForeground);
+  font: inherit;
+  cursor: pointer;
+}
+
+.custom-provider-actions button:hover,
+.custom-provider-footer button:hover {
+  background: var(--vscode-button-secondaryHoverBackground);
+}
+
+.custom-provider-footer {
+  justify-content: flex-end;
+}
+
+.custom-provider-footer .primary {
+  background: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+}
+
+.custom-provider-footer .primary:hover {
+  background: var(--vscode-button-hoverBackground);
+}
+
 /* Session Dropdown */
 .session-dropdown {
   position: absolute;
@@ -565,6 +691,131 @@ body {
   border-radius: 2px;
 }
 
+/* Session item action buttons (delete / export / rename) */
+.session-dropdown-actions {
+  display: none;
+  gap: 2px;
+  align-items: center;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.session-dropdown-item:hover .session-dropdown-actions {
+  display: flex;
+}
+
+.session-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 2px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--vscode-descriptionForeground);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.session-action-btn:hover {
+  background: var(--vscode-toolbar-hoverBackground);
+  color: var(--vscode-foreground);
+}
+
+.session-action-delete:hover {
+  background: var(--vscode-inputValidation-errorBackground, #5a1d1d);
+  color: var(--vscode-inputValidation-errorForeground, #f48771);
+}
+
+/* Custom modal overlay (replaces window.confirm/prompt blocked in VS Code webviews) */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+}
+
+.modal-box {
+  background: var(--vscode-editor-background, #1e1e1e);
+  border: 1px solid var(--vscode-panel-border, #3c3c3c);
+  border-radius: 8px;
+  padding: 20px 24px;
+  min-width: 320px;
+  max-width: 480px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+.modal-message {
+  color: var(--vscode-foreground);
+  font-size: 13px;
+  margin-bottom: 16px;
+  word-break: break-word;
+}
+
+.modal-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 6px 10px;
+  margin-bottom: 16px;
+  border: 1px solid var(--vscode-input-border, #3c3c3c);
+  border-radius: 4px;
+  background: var(--vscode-input-background, #3c3c3c);
+  color: var(--vscode-input-foreground, #cccccc);
+  font-size: 13px;
+  outline: none;
+}
+
+.modal-input:focus {
+  border-color: var(--vscode-focusBorder, #007fd4);
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.modal-btn {
+  padding: 6px 14px;
+  border: none;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.modal-btn-primary {
+  background: var(--vscode-button-background, #0078d4);
+  color: var(--vscode-button-foreground, #ffffff);
+}
+
+.modal-btn-primary:hover {
+  background: var(--vscode-button-hoverBackground, #026ec1);
+}
+
+.modal-btn-secondary {
+  background: var(--vscode-button-secondaryBackground, #3a3d41);
+  color: var(--vscode-button-secondaryForeground, #cccccc);
+}
+
+.modal-btn-secondary:hover {
+  background: var(--vscode-button-secondaryHoverBackground, #45494e);
+}
+
+.modal-btn-danger {
+  background: #c62828;
+  color: #ffffff;
+}
+
+.modal-btn-danger:hover {
+  background: #d32f2f;
+}
+
 /* Chat Container */
 .chat-container {
   display: flex;
@@ -633,7 +884,7 @@ body {
   background-color: var(--vscode-terminal-ansiRed);
 }
 
-/* 连接线：只在有 connect-to-prev class 时显示向上的连接线 */
+/* Connector line: only show the upward line when connect-to-prev class is present */
 .bubble-dot.connect-to-prev::before {
   content: "";
   position: absolute;
@@ -839,7 +1090,7 @@ body {
   background: var(--vscode-editor-background);
 }
 
-/* assistant 角色的展开内容无边框 */
+/* Assistant-role expanded content has no border */
 .bubble.assistant .bubble-collapsible-content {
   border: none;
   background: transparent;
@@ -850,7 +1101,7 @@ body {
   display: none;
 }
 
-/* 普通assistant气泡布局 */
+/* Normal assistant bubble layout */
 .bubble.assistant:has(.bubble-normal-content) {
   display: flex;
   align-items: flex-start;

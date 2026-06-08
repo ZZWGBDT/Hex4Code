@@ -1,5 +1,5 @@
 (function () {
-  const ATTACHMENT_LABEL = "Pasted image";
+  const ATTACHMENT_LABEL = "Pasted Image";
   const PREVIEW_OFFSET = 10;
 
   function createElement(tagName, className) {
@@ -135,7 +135,7 @@
       );
       wrapper.tabIndex = 0;
       wrapper.setAttribute("role", "button");
-      wrapper.setAttribute("aria-label", ATTACHMENT_LABEL + " (Remove)");
+      wrapper.setAttribute("aria-label", ATTACHMENT_LABEL + " (Delete)");
       wrapper.draggable = true;
 
       const removeButton = createElement("a", "monaco-button codicon codicon-close");

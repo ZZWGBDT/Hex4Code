@@ -16,14 +16,10 @@ export function buildThinkingRequestOptions(
   _baseURL?: string,
   reasoningEffort: ReasoningEffort = "max",
 ): ThinkingRequestOptions {
-  const thinking: ThinkingConfig = {
-    type: thinkingEnabled ? "enabled" : "disabled",
-  };
+  const thinking: ThinkingConfig = { type: thinkingEnabled ? "enabled" : "disabled" };
 
   return {
     thinking,
-    ...(thinkingEnabled
-      ? { extra_body: { reasoning_effort: reasoningEffort } }
-      : {}),
+    ...(thinkingEnabled ? { extra_body: { reasoning_effort: reasoningEffort } } : {}),
   };
 }

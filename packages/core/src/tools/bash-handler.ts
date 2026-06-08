@@ -40,13 +40,7 @@ export async function handleBashTool(
   const startCwd = getSessionCwd(context.sessionId, context.projectRoot);
   const { shellPath, shellArgs, marker } = buildShellCommand(command);
 
-  const execution = await executeShellCommand(
-    shellPath,
-    shellArgs,
-    startCwd,
-    command,
-    context,
-  );
+  const execution = await executeShellCommand(shellPath, shellArgs, startCwd, command, context);
   const result = buildToolCommandResult(
     execution.stdout,
     execution.stderr,
@@ -59,11 +53,7 @@ export async function handleBashTool(
   updateSessionCwd(context.sessionId, startCwd, result.cwd);
 
   if (execution.error || result.exitCode !== 0 || result.signal !== null) {
-    const errorMessage = buildErrorMessage(
-      result.exitCode,
-      result.signal,
-      execution.error,
-    );
+    const errorMessage = buildErrorMessage(result.exitCode, result.signal, execution.error);
     return formatResult({ ...result, ok: false }, "bash", errorMessage);
   }
 
@@ -74,11 +64,7 @@ function getSessionCwd(sessionId: string, fallback: string): string {
   return sessionWorkingDirs.get(sessionId) ?? fallback;
 }
 
-function updateSessionCwd(
-  sessionId: string,
-  fallback: string,
-  cwd: string | null,
-): void {
+function updateSessionCwd(sessionId: string, fallback: string, cwd: string | null): void {
   const nextCwd = cwd ?? fallback;
   sessionWorkingDirs.set(sessionId, nextCwd);
 }
@@ -116,13 +102,7 @@ async function executeShellCommand(
   cwd: string,
   command: string,
   context: ToolExecutionContext,
-): Promise<{
-  stdout: string;
-  stderr: string;
-  exitCode: number | null;
-  signal: string | null;
-  error?: string;
-}> {
+): Promise<{ stdout: string; stderr: string; exitCode: number | null; signal: string | null; error?: string }> {
   return new Promise((resolve) => {
     const detached = process.platform !== "win32";
     const configuredEnv = context.createOpenAIClient?.().env ?? {};
@@ -206,10 +186,7 @@ function buildToolCommandResult(
   };
 }
 
-function stripMarker(
-  stdout: string,
-  marker: string,
-): { output: string; cwd: string | null } {
+function stripMarker(stdout: string, marker: string): { output: string; cwd: string | null } {
   if (!stdout) {
     return { output: "", cwd: null };
   }
@@ -250,11 +227,7 @@ function truncateOutput(output: string): { text: string; truncated: boolean } {
   return { text: output.slice(0, MAX_OUTPUT_CHARS), truncated: true };
 }
 
-function buildErrorMessage(
-  exitCode: number | null,
-  signal: string | null,
-  error?: string,
-): string {
+function buildErrorMessage(exitCode: number | null, signal: string | null, error?: string): string {
   if (error) {
     return error;
   }
@@ -267,11 +240,7 @@ function buildErrorMessage(
   return "Command failed.";
 }
 
-function formatResult(
-  result: ToolCommandResult,
-  name: string,
-  errorMessage?: string,
-): ToolExecutionResult {
+function formatResult(result: ToolCommandResult, name: string, errorMessage?: string): ToolExecutionResult {
   const metadata: Record<string, unknown> = {
     exitCode: result.exitCode,
     signal: result.signal,

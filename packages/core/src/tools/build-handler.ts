@@ -71,14 +71,7 @@ export async function handleBuildTool(
   // Determine source files for manual compilation fallback
   const sourceFiles = collectSourceFiles(projectDir);
 
-  const buildCommand = buildBuildCommand(
-    projectDir,
-    buildSystem,
-    target,
-    clean,
-    flags,
-    sourceFiles,
-  );
+  const buildCommand = buildBuildCommand(projectDir, buildSystem, target, clean, flags, sourceFiles);
   const startTime = Date.now();
 
   const pid = `${project}-build-${Date.now()}`;
@@ -87,12 +80,7 @@ export async function handleBuildTool(
   try {
     const result = await executeBuild(buildCommand.command, projectDir, pid);
     const durationMs = Date.now() - startTime;
-    const parsed = parseBuildOutput(
-      result.stdout + "\n" + result.stderr,
-      projectDir,
-      durationMs,
-      result.exitCode,
-    );
+    const parsed = parseBuildOutput(result.stdout + "\n" + result.stderr, projectDir, durationMs, result.exitCode);
 
     // ── Confidence: derive certainty from build outcome ──────────────
     // TC_NONE:      clean build, no errors or warnings → fully certain
@@ -130,13 +118,8 @@ export async function handleBuildTool(
       parsed.errors.length > 0
         ? `Build failed (${parsed.errors.length} errors, ${parsed.warnings.length} warnings):\n${parsed.errors
             .slice(0, 10)
-            .map(
-              (e) =>
-                `  ${e.file}:${e.line}:${e.column} [${e.type}] ${e.message}`,
-            )
-            .join(
-              "\n",
-            )}${parsed.errors.length > 10 ? `\n  ... and ${parsed.errors.length - 10} more errors` : ""}`
+            .map((e) => `  ${e.file}:${e.line}:${e.column} [${e.type}] ${e.message}`)
+            .join("\n")}${parsed.errors.length > 10 ? `\n  ... and ${parsed.errors.length - 10} more errors` : ""}`
         : `Build failed with exit code ${result.exitCode}. No parseable errors found. Raw output:\n${truncateOutput(result.stdout, 2000)}`;
 
     return {
@@ -165,15 +148,7 @@ export async function handleBuildTool(
   }
 }
 
-type BuildSystem =
-  | "make"
-  | "cmake"
-  | "cargo"
-  | "npm"
-  | "go"
-  | "maven"
-  | "gradle"
-  | "python";
+type BuildSystem = "make" | "cmake" | "cargo" | "npm" | "go" | "maven" | "gradle" | "python";
 
 type BuildSystemInfo = {
   type: BuildSystem;
@@ -228,15 +203,7 @@ function detectBuildSystem(dir: string): BuildSystemInfo | null {
 
 function collectSourceFiles(dir: string): string[] {
   try {
-    return fs
-      .readdirSync(dir)
-      .filter(
-        (f) =>
-          f.endsWith(".c") ||
-          f.endsWith(".cpp") ||
-          f.endsWith(".rs") ||
-          f.endsWith(".go"),
-      );
+    return fs.readdirSync(dir).filter((f) => f.endsWith(".c") || f.endsWith(".cpp") || f.endsWith(".rs") || f.endsWith(".go"));
   } catch {
     return [];
   }
@@ -331,10 +298,9 @@ function buildBuildCommand(
         cmds.push(`pip install -e . 2>&1`);
       } else {
         // Default: run a target script or sdist
-        const pyTarget =
-          target && fs.existsSync(path.join(projectDir, target))
-            ? `python ${target}`
-            : `python -m build 2>&1 || python setup.py build 2>&1`;
+        const pyTarget = target && fs.existsSync(path.join(projectDir, target))
+          ? `python ${target}`
+          : `python -m build 2>&1 || python setup.py build 2>&1`;
         cmds.push(pyTarget);
       }
       return { command: cmds.join("; "), cwd: projectDir };
@@ -380,11 +346,7 @@ function executeBuild(
 
     child.on("close", (code) => {
       clearTimeout(timeoutId);
-      resolve({
-        stdout,
-        stderr,
-        exitCode: typeof code === "number" ? code : null,
-      });
+      resolve({ stdout, stderr, exitCode: typeof code === "number" ? code : null });
     });
 
     child.on("error", (err) => {
@@ -411,10 +373,7 @@ function parseBuildOutput(
   const lines = output.split("\n");
   for (const line of lines) {
     // Match gcc/clang error/warning, fatal error, clang-style error
-    const m =
-      line.match(GCC_ERROR_RE) ||
-      line.match(FATAL_ERROR_RE) ||
-      line.match(CLANG_ERROR_RE);
+    const m = line.match(GCC_ERROR_RE) || line.match(FATAL_ERROR_RE) || line.match(CLANG_ERROR_RE);
     if (m) {
       const entry: BuildError = {
         file: m[1],
@@ -430,46 +389,24 @@ function parseBuildOutput(
     // Match make errors (no column field)
     const makeM = line.match(MAKE_ERROR_RE);
     if (makeM) {
-      errors.push({
-        file: makeM[1],
-        line: parseInt(makeM[2], 10),
-        column: 0,
-        type: "error",
-        message: makeM[3],
-      });
+      errors.push({ file: makeM[1], line: parseInt(makeM[2], 10), column: 0, type: "error", message: makeM[3] });
       continue;
     }
     // Match linker errors
     if (LD_ERROR_RE.test(line)) {
-      errors.push({
-        file: "(linker)",
-        line: 0,
-        column: 0,
-        type: "error",
-        message: line.trim().substring(0, 200),
-      });
+      errors.push({ file: "(linker)", line: 0, column: 0, type: "error", message: line.trim().substring(0, 200) });
     }
   }
 
   const truncated = output.length > MAX_OUTPUT_CHARS;
   const ok = exitCode === 0 && errors.length === 0;
 
-  return {
-    ok,
-    project: projectDir,
-    errors,
-    warnings,
-    durationMs,
-    exitCode,
-    truncated,
-  };
+  return { ok, project: projectDir, errors, warnings, durationMs, exitCode, truncated };
 }
 
 function truncateOutput(output: string, maxLen: number): string {
   if (output.length <= maxLen) return output;
-  return (
-    output.slice(0, maxLen) + `\n... (truncated, total ${output.length} chars)`
-  );
+  return output.slice(0, maxLen) + `\n... (truncated, total ${output.length} chars)`;
 }
 
 function shellQuote(s: string): string {

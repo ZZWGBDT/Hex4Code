@@ -1,10 +1,10 @@
 # Hex4Code
 
-[Hex4Code](https://marketplace.visualstudio.com/items?itemName=hex4code-vscode) is a Visual Studio Code AI coding assistant extension, specially optimized for the latest `deepseek-v4` models.
+[Hex4Code](https://marketplace.visualstudio.com/items?itemName=hex4code-vscode) is an AI coding assistant extension for Visual Studio Code, specifically optimized for the latest `deepseek-v4` model.
 
 ## Configuration
 
-Create a `~/.hex4code/settings.json` file with the following content:
+Create `~/.hex4code/settings.json` with:
 
 ```json
 {
@@ -22,26 +22,27 @@ Create a `~/.hex4code/settings.json` file with the following content:
 
 ### **Skills**
 
-Hex4Code supports agent skills, allowing you to extend the assistant's capabilities:
+Hex4Code supports agent skills that allows you to extend the assistant's capabilities:
 
-- **User-level Skills**: Skills are discovered and activated from the `~/.agents/skills/` directory.
-- **Project-level Skills**: Project-specific skills are loaded from `./.agents/skills/`, with backward compatibility for the legacy `./.hex4code/skills/` directory.
+- **User-level Skills**: discovered and activated from `~/.agents/skills/`.
+- **Project-level Skills**: loaded from `./.agents/skills/` for project-specific workflows, with legacy `./.hex4code/skills/` compatibility.
 
 ### **Optimized for DeepSeek**
 
-- Performance-tuned specifically for DeepSeek models.
-- Cost reduction through [context caching](https://api-docs.deepseek.com/guides/kv_cache).
-- Native support for [thinking mode](https://api-docs.deepseek.com/guides/thinking_mode) and reasoning effort control.
+- Specifically tuned for DeepSeek model performance.
+- Reduce costs by using [Context Caching](https://api-docs.deepseek.com/guides/kv_cache).
+- Natively supports [Thinking Mode](https://api-docs.deepseek.com/guides/thinking_mode) and Thinking Effort Control.
 
 ## Supported Models
 
-- `deepseek-v4-pro` (recommended)
+- `deepseek-v4-pro` (Recommended)
 - `deepseek-v4-flash`
+- `deepseek-chat`
 - Any other OpenAI-compatible model
 
 ## Screenshot
 
-![screenshot](https://github.com/ZZWGBDT/Hex4Code/raw/master/vscode/resources/hex4code_screenshot.png)
+![screenshot](resources/hex4code_screenshot.png)
 
 ## Hex4Code CLI
 
@@ -49,27 +50,27 @@ Hex4Code supports agent skills, allowing you to extend the assistant's capabilit
 npm install -g @hex4code/cli
 ```
 
-> The VS Code extension and CLI share configuration files and data, but are runtime-independent.
+> The VSCode plugin and CLI share configuration and data, but they have no dependencies at runtime.
 
-- GitHub: https://github.com/ZZWGBDT/Hex4Code
+- GitHub： https://github.com/ZZWGBDT/Hex4Code
 
 ## FAQ
 
-### How do I move Hex4Code from the left sidebar to the right sidebar (Secondary Side Bar)?
+### How can I move Hex4Code from the left sidebar to the right (Secondary Side Bar) in VS Code?
 
-![faq1](https://github.com/ZZWGBDT/Hex4Code/raw/master/vscode/resources/faq1.gif)
+![faq1](resources/faq1.gif)
 
-### Does Hex4Code support image understanding?
+### Does Hex4Code support understanding images?
 
-Hex4Code supports multimodal inputs. However, the current deepseek-v4 model does not support multimodal. While some models have multimodal capabilities, they may have strict limits on multi-turn conversation requests. For multimodal input, the Doubao-Seed-2.0-pro model from Volcano Engine is recommended for the best experience.
+Hex4Code supports multimodal, but `deepseek-v4` does not support multimodal yet. Some models have multimodal capabilities but impose strict limits on multi-turn dialogue requests. For multimodal input, we recommend using the Volcano Ark `Doubao-Seed-2.0-pro` model, which has the best integration.
 
-### How do I send automatic notifications after a task completes?
+### How to automatically send a notification after a task completes?
 
-Write a shell notification script that calls a notification webhook, then set the `notify` field in `~/.hex4code/settings.json` to the full path of that script. For detailed steps, refer to the project docs.
+Write a shell notification script that calls a notification webhook, then set the `notify` field in `~/.hex4code/settings.json` to the full path of the script. For detailed steps. Refer to the project documentation for details
 
 ### Does it support Coding Plan?
 
-Yes. Just configure `env.BASE_URL` in `~/.hex4code/settings.json` to an OpenAI-compatible endpoint. Using Volcano Engine's Coding Plan as an example, configure `~/.hex4code/settings.json` like this:
+Yes. Just set `env.BASE_URL` in `~/.hex4code/settings.json` to an OpenAI-compatible API endpoint. Take Volcano Ark's Coding Plan as an example, configure `~/.hex4code/settings.json` as follows:
 
 ```json
 {
@@ -82,14 +83,6 @@ Yes. Just configure `env.BASE_URL` in `~/.hex4code/settings.json` to an OpenAI-c
 }
 ```
 
-## Get Help
+## Getting Help
 
 - Report bugs or request features on GitHub Issues (https://github.com/ZZWGBDT/Hex4Code/issues)
-
-## Support Us
-
-If you find this extension helpful, please consider supporting us by:
-
-- Giving us a Star on GitHub (https://github.com/ZZWGBDT/Hex4Code)
-- Submitting feedback and suggestions
-- Sharing with your friends and colleagues

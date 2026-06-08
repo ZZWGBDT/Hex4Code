@@ -5,23 +5,11 @@ import * as crypto from "crypto";
 import { fileURLToPath } from "url";
 import matter from "gray-matter";
 import ejs from "ejs";
-import type {
-  ChatCompletionMessageParam,
-  ChatCompletionContentPart,
-} from "openai/resources/chat/completions";
+import type { ChatCompletionMessageParam, ChatCompletionContentPart } from "openai/resources/chat/completions";
 import { launchNotifyScript } from "./common/notify";
 import { buildThinkingRequestOptions } from "./common/openai-thinking";
-import {
-  DEEPSEEK_V4_MODELS,
-  supportsMultimodal,
-} from "./common/model-capabilities";
-import {
-  getCompactPrompt,
-  getSystemPrompt,
-  getTools,
-  AGENT_DRIFT_GUARD_SKILL,
-  type ToolDefinition,
-} from "./prompt";
+import { DEEPSEEK_V4_MODELS, supportsMultimodal } from "./common/model-capabilities";
+import { getCompactPrompt, getSystemPrompt, getTools, AGENT_DRIFT_GUARD_SKILL, type ToolDefinition } from "./prompt";
 import {
   ToolExecutor,
   type CreateOpenAIClient,
@@ -39,20 +27,13 @@ import { loadKnowledgeBase } from "./knowledge/kb-loader";
 void searchKnowledge;
 void extractErrorPatterns;
 void loadKnowledgeBase;
-import {
-  logOpenAIChatCompletionDebug,
-  normalizeDebugError,
-} from "./common/debug-logger";
+import { logOpenAIChatCompletionDebug, normalizeDebugError } from "./common/debug-logger";
 
 const MAX_SESSION_ENTRIES = 50;
 // ── UI abstraction interface (decoupled from Ink) ──────────
 export interface SessionUI {
   onMessage: (msg: SessionMessage) => void;
-  onToolResult: (
-    toolCallId: string,
-    content: string,
-    result: ToolExecutionResult,
-  ) => void;
+  onToolResult: (toolCallId: string, content: string, result: ToolExecutionResult) => void;
   onError: (error: string) => void;
   onProcessStart?: (processId: string | number, command: string) => void;
   onProcessExit?: (processId: string | number) => void;
@@ -81,18 +62,13 @@ function isUsageRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
-function summarizeCompletionOptions(
-  options?: Record<string, unknown>,
-): Record<string, unknown> | undefined {
+function summarizeCompletionOptions(options?: Record<string, unknown>): Record<string, unknown> | undefined {
   if (!options) {
     return undefined;
   }
   return {
     ...options,
-    signal:
-      options.signal instanceof AbortSignal
-        ? { aborted: options.signal.aborted }
-        : options.signal,
+    signal: options.signal instanceof AbortSignal ? { aborted: options.signal.aborted } : options.signal,
   };
 }
 
@@ -113,10 +89,7 @@ function addUsageValue(current: unknown, next: unknown): unknown {
   return next;
 }
 
-function accumulateUsage(
-  current: unknown | null,
-  next: unknown | null | undefined,
-): unknown | null {
+function accumulateUsage(current: unknown | null, next: unknown | null | undefined): unknown | null {
   if (next == null) {
     return current ?? null;
   }
@@ -140,13 +113,7 @@ function getTotalTokens(usage: unknown | null | undefined): number {
   return typeof totalTokens === "number" ? totalTokens : 0;
 }
 
-export type SessionStatus =
-  | "failed"
-  | "pending"
-  | "processing"
-  | "waiting_for_user"
-  | "completed"
-  | "interrupted";
+export type SessionStatus = "failed" | "pending" | "processing" | "waiting_for_user" | "completed" | "interrupted";
 
 export type SessionEntry = {
   id: string;
@@ -181,6 +148,7 @@ export type MessageMeta = {
   isSummary?: boolean;
   isModelChange?: boolean;
   skill?: SkillInfo;
+  activeFile?: { path: string; content?: string } | null;
 };
 
 export type SessionMessage = {
@@ -215,11 +183,7 @@ export type SkillInfo = {
 type SessionManagerOptions = {
   projectRoot: string;
   createOpenAIClient: CreateOpenAIClient;
-  getResolvedSettings: () => {
-    model: string;
-    webSearchTool?: string;
-    mcpServers?: Record<string, McpServerConfig>;
-  };
+  getResolvedSettings: () => { model: string; webSearchTool?: string; mcpServers?: Record<string, McpServerConfig> };
   renderMarkdown: (text: string) => string;
   onAssistantMessage: (message: SessionMessage, shouldConnect: boolean) => void;
   onSessionEntryUpdated?: (entry: SessionEntry) => void;
@@ -244,10 +208,7 @@ export class SessionManager {
     webSearchTool?: string;
     mcpServers?: Record<string, McpServerConfig>;
   };
-  private readonly onAssistantMessage: (
-    message: SessionMessage,
-    shouldConnect: boolean,
-  ) => void;
+  private readonly onAssistantMessage: (message: SessionMessage, shouldConnect: boolean) => void;
   private readonly onSessionEntryUpdated?: (entry: SessionEntry) => void;
   public readonly ui?: SessionUI;
   private readonly onLlmStreamProgress?: (progress: LlmStreamProgress) => void;
@@ -258,11 +219,7 @@ export class SessionManager {
   private readonly mcpManager = new McpManager();
   private mcpToolDefinitions: ToolDefinition[] = [];
   /** LazyTrit memory: accumulates TC states across turns, resolved lazily on compact */
-  private readonly turnTcHistory: {
-    turnTc: TCType;
-    chain: TCType[];
-    timestamp: number;
-  }[] = [];
+  private readonly turnTcHistory: { turnTc: TCType; chain: TCType[]; timestamp: number }[] = [];
 
   constructor(options: SessionManagerOptions) {
     this.projectRoot = options.projectRoot;
@@ -272,17 +229,11 @@ export class SessionManager {
     this.onSessionEntryUpdated = options.onSessionEntryUpdated;
     this.ui = options.ui;
     this.onLlmStreamProgress = options.onLlmStreamProgress;
-    this.toolExecutor = new ToolExecutor(
-      this.projectRoot,
-      this.createOpenAIClient,
-      this.mcpManager,
-    );
+    this.toolExecutor = new ToolExecutor(this.projectRoot, this.createOpenAIClient, this.mcpManager);
     this.mcpManager.prepare(this.getResolvedSettings().mcpServers);
   }
 
-  async initMcpServers(
-    servers?: Record<string, McpServerConfig>,
-  ): Promise<void> {
+  async initMcpServers(servers?: Record<string, McpServerConfig>): Promise<void> {
     await this.mcpManager.initialize(servers);
     this.mcpToolDefinitions = this.mcpManager.getMcpToolDefinitions();
   }
@@ -346,10 +297,7 @@ export class SessionManager {
       return false;
     }
 
-    return (
-      error.name === "AbortError" ||
-      error.constructor.name === "APIUserAbortError"
-    );
+    return error.name === "AbortError" || error.constructor.name === "APIUserAbortError";
   }
 
   private throwIfAborted(signal?: AbortSignal | null): void {
@@ -376,21 +324,14 @@ export class SessionManager {
     const startedAt = new Date().toISOString();
     const startedAtMs = Date.now();
     let estimatedTokens = 0;
-    this.emitLlmStreamProgress(
-      requestId,
-      startedAt,
-      estimatedTokens,
-      "start",
-      sessionId,
-    );
+    this.emitLlmStreamProgress(requestId, startedAt, estimatedTokens, "start", sessionId);
 
     const streamRequest = {
       ...request,
+      messages: this.normalizeProviderMessages(request.messages, debug?.baseURL),
       stream: true,
       stream_options: {
-        ...(isUsageRecord(request.stream_options)
-          ? request.stream_options
-          : {}),
+        ...(isUsageRecord(request.stream_options) ? request.stream_options : {}),
         include_usage: true,
       },
     };
@@ -406,17 +347,13 @@ export class SessionManager {
     } catch (error) {
       this.logChatCompletionDebug(debug, {
         timestamp: new Date().toISOString(),
-        location:
-          debug?.location ?? "SessionManager.createChatCompletionStream:create",
+        location: debug?.location ?? "SessionManager.createChatCompletionStream:create",
         requestId,
         sessionId,
         model: typeof request.model === "string" ? request.model : undefined,
         baseURL: debug?.baseURL,
         durationMs: Date.now() - startedAtMs,
-        params: {
-          ...debug?.params,
-          options: summarizeCompletionOptions(options),
-        },
+        params: { ...debug?.params, options: summarizeCompletionOptions(options) },
         request: streamRequest,
         error: normalizeDebugError(error),
       });
@@ -433,49 +370,25 @@ export class SessionManager {
         },
         request: streamRequest,
       });
-      this.emitLlmStreamProgress(
-        requestId,
-        startedAt,
-        estimatedTokens,
-        "end",
-        sessionId,
-      );
+      this.emitLlmStreamProgress(requestId, startedAt, estimatedTokens, "end", sessionId);
       throw error;
     }
 
-    if (
-      !response ||
-      typeof (response as { [Symbol.asyncIterator]?: unknown })[
-        Symbol.asyncIterator
-      ] !== "function"
-    ) {
-      this.emitLlmStreamProgress(
-        requestId,
-        startedAt,
-        estimatedTokens,
-        "end",
-        sessionId,
-      );
+    if (!response || typeof (response as { [Symbol.asyncIterator]?: unknown })[Symbol.asyncIterator] !== "function") {
+      this.emitLlmStreamProgress(requestId, startedAt, estimatedTokens, "end", sessionId);
       this.logChatCompletionDebug(debug, {
         timestamp: new Date().toISOString(),
-        location:
-          debug?.location ?? "SessionManager.createChatCompletionStream",
+        location: debug?.location ?? "SessionManager.createChatCompletionStream",
         requestId,
         sessionId,
         model: typeof request.model === "string" ? request.model : undefined,
         baseURL: debug?.baseURL,
         durationMs: Date.now() - startedAtMs,
-        params: {
-          ...debug?.params,
-          options: summarizeCompletionOptions(options),
-        },
+        params: { ...debug?.params, options: summarizeCompletionOptions(options) },
         request: streamRequest,
         response,
       });
-      return response as {
-        choices?: Array<{ message?: Record<string, unknown> }>;
-        usage?: unknown;
-      };
+      return response as { choices?: Array<{ message?: Record<string, unknown> }>; usage?: unknown };
     }
 
     let content = "";
@@ -497,19 +410,11 @@ export class SessionManager {
         return;
       }
       estimatedTokens += this.estimateStreamTokens(value);
-      this.emitLlmStreamProgress(
-        requestId,
-        startedAt,
-        estimatedTokens,
-        "update",
-        sessionId,
-      );
+      this.emitLlmStreamProgress(requestId, startedAt, estimatedTokens, "update", sessionId);
     };
 
     try {
-      for await (const chunk of response as AsyncIterable<
-        Record<string, unknown>
-      >) {
+      for await (const chunk of response as AsyncIterable<Record<string, unknown>>) {
         if (debug?.enabled) {
           responseChunks.push(chunk);
         }
@@ -519,10 +424,7 @@ export class SessionManager {
 
         const choices = Array.isArray(chunk.choices) ? chunk.choices : [];
         for (const choice of choices) {
-          const delta =
-            isUsageRecord(choice) && isUsageRecord(choice.delta)
-              ? choice.delta
-              : null;
+          const delta = isUsageRecord(choice) && isUsageRecord(choice.delta) ? choice.delta : null;
           if (!delta) {
             continue;
           }
@@ -550,10 +452,7 @@ export class SessionManager {
               if (!isUsageRecord(rawToolCall)) {
                 continue;
               }
-              const index =
-                typeof rawToolCall.index === "number"
-                  ? rawToolCall.index
-                  : toolCallsByIndex.size;
+              const index = typeof rawToolCall.index === "number" ? rawToolCall.index : toolCallsByIndex.size;
               const current = toolCallsByIndex.get(index) ?? {};
               if (typeof rawToolCall.id === "string") {
                 current.id = rawToolCall.id;
@@ -566,9 +465,7 @@ export class SessionManager {
               if (typeof rawToolCall.type === "string") {
                 current.type = rawToolCall.type;
               }
-              const rawFunction = isUsageRecord(rawToolCall.function)
-                ? rawToolCall.function
-                : null;
+              const rawFunction = isUsageRecord(rawToolCall.function) ? rawToolCall.function : null;
               if (rawFunction) {
                 current.function = current.function ?? {};
                 if (typeof rawFunction.name === "string") {
@@ -588,17 +485,13 @@ export class SessionManager {
     } catch (error) {
       this.logChatCompletionDebug(debug, {
         timestamp: new Date().toISOString(),
-        location:
-          debug?.location ?? "SessionManager.createChatCompletionStream:stream",
+        location: debug?.location ?? "SessionManager.createChatCompletionStream:stream",
         requestId,
         sessionId,
         model: typeof request.model === "string" ? request.model : undefined,
         baseURL: debug?.baseURL,
         durationMs: Date.now() - startedAtMs,
-        params: {
-          ...debug?.params,
-          options: summarizeCompletionOptions(options),
-        },
+        params: { ...debug?.params, options: summarizeCompletionOptions(options) },
         request: streamRequest,
         responseChunks,
         error: normalizeDebugError(error),
@@ -618,13 +511,7 @@ export class SessionManager {
       });
       throw error;
     } finally {
-      this.emitLlmStreamProgress(
-        requestId,
-        startedAt,
-        estimatedTokens,
-        "end",
-        sessionId,
-      );
+      this.emitLlmStreamProgress(requestId, startedAt, estimatedTokens, "end", sessionId);
     }
 
     const toolCalls = Array.from(toolCallsByIndex.entries())
@@ -653,15 +540,33 @@ export class SessionManager {
       model: typeof request.model === "string" ? request.model : undefined,
       baseURL: debug?.baseURL,
       durationMs: Date.now() - startedAtMs,
-      params: {
-        ...debug?.params,
-        options: summarizeCompletionOptions(options),
-      },
+      params: { ...debug?.params, options: summarizeCompletionOptions(options) },
       request: streamRequest,
       responseChunks,
       response: finalResponse,
     });
     return finalResponse;
+  }
+
+  private normalizeProviderMessages(messages: unknown, baseURL?: string): unknown {
+    if (!Array.isArray(messages)) {
+      return messages;
+    }
+    if (!(baseURL ?? "").toLowerCase().includes("minimaxi.com")) {
+      return messages;
+    }
+    return messages.map((message) => {
+      if (!isUsageRecord(message) || message.role !== "system") {
+        return message;
+      }
+      const content = message.content;
+      const text = typeof content === "string" ? content : JSON.stringify(content ?? "");
+      return {
+        ...message,
+        role: "user",
+        content: `[system]\n${text}`,
+      };
+    });
   }
 
   private logChatCompletionDebug(
@@ -699,8 +604,7 @@ The candidate skills are as follows:\n\n`;
     }
     systemPrompt += "```\n" + JSON.stringify(simpleSkills, null, 2) + "\n```";
 
-    const { client, model, baseURL, debugLogEnabled } =
-      this.createOpenAIClient();
+    const { client, model, baseURL, debugLogEnabled } = this.createOpenAIClient();
     if (!client) {
       return [];
     }
@@ -750,16 +654,8 @@ The candidate skills are as follows:\n\n`;
   async listSkills(sessionId?: string): Promise<SkillInfo[]> {
     const homeDir = os.homedir();
     const agentsRoot = path.join(homeDir, ".agents", "skills");
-    const legacyProjectSkillsRoot = path.join(
-      this.projectRoot,
-      ".hex4code",
-      "skills",
-    );
-    const projectAgentsSkillsRoot = path.join(
-      this.projectRoot,
-      ".agents",
-      "skills",
-    );
+    const legacyProjectSkillsRoot = path.join(this.projectRoot, ".hex4code", "skills");
+    const projectAgentsSkillsRoot = path.join(this.projectRoot, ".agents", "skills");
     const skillsByName = new Map<string, SkillInfo>();
 
     const collectSkills = (root: string, displayRoot: string): SkillInfo[] => {
@@ -791,13 +687,7 @@ The candidate skills are as follows:\n\n`;
         } catch {
           continue;
         }
-        results.push(
-          this.readSkillInfo(
-            skillPath,
-            `${displayRoot}/${skillName}/SKILL.md`,
-            skillName,
-          ),
-        );
+        results.push(this.readSkillInfo(skillPath, `${displayRoot}/${skillName}/SKILL.md`, skillName));
       }
       return results;
     };
@@ -805,34 +695,23 @@ The candidate skills are as follows:\n\n`;
     for (const skill of collectSkills(agentsRoot, "~/.agents/skills")) {
       skillsByName.set(skill.name, skill);
     }
-    for (const skill of collectSkills(
-      legacyProjectSkillsRoot,
-      "./.hex4code/skills",
-    )) {
+    for (const skill of collectSkills(legacyProjectSkillsRoot, "./.hex4code/skills")) {
       skillsByName.set(skill.name, skill);
     }
-    for (const skill of collectSkills(
-      projectAgentsSkillsRoot,
-      "./.agents/skills",
-    )) {
+    for (const skill of collectSkills(projectAgentsSkillsRoot, "./.agents/skills")) {
       skillsByName.set(skill.name, skill);
     }
 
     if (sessionId) {
       const loadedSkillKeys = this.getLoadedSkillKeys(sessionId);
       for (const skill of skillsByName.values()) {
-        if (
-          loadedSkillKeys.has(this.getSkillKey(skill)) ||
-          loadedSkillKeys.has(this.getSkillKeyByName(skill.name))
-        ) {
+        if (loadedSkillKeys.has(this.getSkillKey(skill)) || loadedSkillKeys.has(this.getSkillKeyByName(skill.name))) {
           skill.isLoaded = true;
         }
       }
     }
 
-    return Array.from(skillsByName.values()).sort((a, b) =>
-      a.name.localeCompare(b.name),
-    );
+    return Array.from(skillsByName.values()).sort((a, b) => a.name.localeCompare(b.name));
   }
 
   private resolveSkillPath(skillPath: string): string {
@@ -854,11 +733,7 @@ The candidate skills are as follows:\n\n`;
     return path.join(os.homedir(), skillPath);
   }
 
-  private readSkillInfo(
-    skillPath: string,
-    displayPath: string,
-    fallbackName: string,
-  ): SkillInfo {
+  private readSkillInfo(skillPath: string, displayPath: string, fallbackName: string): SkillInfo {
     const fallbackSkill: SkillInfo = {
       name: fallbackName.replace(/_/g, "-"),
       path: displayPath,
@@ -874,10 +749,7 @@ The candidate skills are as follows:\n\n`;
             ? parsed.data.name.trim()
             : fallbackSkill.name,
         path: displayPath,
-        description:
-          typeof parsed.data.description === "string"
-            ? parsed.data.description.trim()
-            : "",
+        description: typeof parsed.data.description === "string" ? parsed.data.description.trim() : "",
       };
     } catch {
       return fallbackSkill;
@@ -927,10 +799,7 @@ The candidate skills are as follows:\n\n`;
     return Array.from(dedupedSkills.values());
   }
 
-  private async normalizeSkills(
-    skills?: SkillInfo[],
-    sessionId?: string,
-  ): Promise<SkillInfo[] | undefined> {
+  private async normalizeSkills(skills?: SkillInfo[], sessionId?: string): Promise<SkillInfo[] | undefined> {
     const dedupedSkills = this.dedupeSkills(skills);
     if (!dedupedSkills || dedupedSkills.length === 0) {
       return undefined;
@@ -967,19 +836,8 @@ The candidate skills are as follows:\n\n`;
     this.activeSessionId = sessionId;
   }
 
-  addSessionSystemMessage(
-    sessionId: string,
-    content: string,
-    visible?: boolean,
-    meta?: MessageMeta,
-  ): void {
-    const message = this.buildSystemMessage(
-      sessionId,
-      content,
-      null,
-      visible,
-      meta,
-    );
+  addSessionSystemMessage(sessionId: string, content: string, visible?: boolean, meta?: MessageMeta): void {
+    const message = this.buildSystemMessage(sessionId, content, null, visible, meta);
     if (sessionId) this.appendSessionMessage(sessionId, message);
     this.onAssistantMessage(message, false);
   }
@@ -1005,20 +863,13 @@ The candidate skills are as follows:\n\n`;
     }
   }
 
-  async createSession(
-    userPrompt: UserPromptContent,
-    controller?: AbortController,
-  ): Promise<string> {
+  async createSession(userPrompt: UserPromptContent, controller?: AbortController): Promise<string> {
     const signal = controller?.signal;
     this.throwIfAborted(signal);
 
     if (userPrompt.text) {
       const skills = await this.listSkills();
-      const skillNames = await this.identifyMatchingSkillNames(
-        skills,
-        userPrompt.text,
-        { signal },
-      );
+      const skillNames = await this.identifyMatchingSkillNames(skills, userPrompt.text, { signal });
       this.throwIfAborted(signal);
       const skillSet = new Set(skillNames);
       const matchedSkill = skills.filter((skill) => skillSet.has(skill.name));
@@ -1035,9 +886,7 @@ The candidate skills are as follows:\n\n`;
     const index = this.loadSessionsIndex();
     const entry: SessionEntry = {
       id: sessionId,
-      summary: userPrompt.text
-        ? userPrompt.text.slice(0, 100)
-        : "[Image Prompt]",
+      summary: userPrompt.text ? userPrompt.text.slice(0, 100) : "[Image Prompt]",
       assistantReply: null,
       assistantThinking: null,
       assistantRefusal: null,
@@ -1062,34 +911,23 @@ The candidate skills are as follows:\n\n`;
     });
     const keptEntries = sortedEntries.slice(0, MAX_SESSION_ENTRIES);
     const keptIds = new Set(keptEntries.map((item) => item.id));
-    const droppedEntries = sortedEntries.filter(
-      (item) => !keptIds.has(item.id),
-    );
+    const droppedEntries = sortedEntries.filter((item) => !keptIds.has(item.id));
     index.entries = keptEntries;
     this.saveSessionsIndex(index);
     this.removeSessionMessages(droppedEntries.map((item) => item.id));
 
-    const systemPrompt = getSystemPrompt(
-      this.projectRoot,
-      this.getPromptToolOptions(),
-    );
+    const systemPrompt = getSystemPrompt(this.projectRoot, this.getPromptToolOptions());
     const systemMessage = this.buildSystemMessage(sessionId, systemPrompt);
     this.appendSessionMessage(sessionId, systemMessage);
 
     const agentInstructions = this.loadAgentInstructions();
     if (agentInstructions) {
-      const instructionsMessage = this.buildSystemMessage(
-        sessionId,
-        agentInstructions,
-      );
+      const instructionsMessage = this.buildSystemMessage(sessionId, agentInstructions);
       this.appendSessionMessage(sessionId, instructionsMessage);
     }
 
     const defaultSkillPrompt = `Use the skill document below to assist the user:\n<agent-drift-guard-skill>${AGENT_DRIFT_GUARD_SKILL}</agent-drift-guard-skill>`;
-    const defaultSkillMessage = this.buildSystemMessage(
-      sessionId,
-      defaultSkillPrompt,
-    );
+    const defaultSkillMessage = this.buildSystemMessage(sessionId, defaultSkillPrompt);
     this.appendSessionMessage(sessionId, defaultSkillMessage);
 
     const userMessage = this.buildUserMessage(sessionId, userPrompt);
@@ -1100,19 +938,12 @@ The candidate skills are as follows:\n\n`;
         if (skill.isLoaded) {
           continue;
         }
-        const skillMd = fs.readFileSync(
-          this.resolveSkillPath(skill.path),
-          "utf8",
-        );
+        const skillMd = fs.readFileSync(this.resolveSkillPath(skill.path), "utf8");
         const skillPrompt = `Use the skill document below to assist the user:\n
 <${skill.name}-skill path="${this.resolveSkillPath(skill.path)}">
 ${skillMd}
 </${skill.name}-skill>`;
-        const skillMessage = this.buildSkillMessage(
-          sessionId,
-          skillPrompt,
-          skill,
-        );
+        const skillMessage = this.buildSkillMessage(sessionId, skillPrompt, skill);
         this.appendSessionMessage(sessionId, skillMessage);
         this.onAssistantMessage(skillMessage, true);
       }
@@ -1123,11 +954,7 @@ ${skillMd}
     return sessionId;
   }
 
-  async replySession(
-    sessionId: string,
-    userPrompt: UserPromptContent,
-    controller?: AbortController,
-  ): Promise<void> {
+  async replySession(sessionId: string, userPrompt: UserPromptContent, controller?: AbortController): Promise<void> {
     const signal = controller?.signal;
     this.throwIfAborted(signal);
     const now = new Date().toISOString();
@@ -1143,13 +970,10 @@ ${skillMd}
       return;
     }
 
+
     if (userPrompt.text) {
       const skills = await this.listSkills(sessionId);
-      const skillNames = await this.identifyMatchingSkillNames(
-        skills,
-        userPrompt.text,
-        { signal, sessionId },
-      );
+      const skillNames = await this.identifyMatchingSkillNames(skills, userPrompt.text, { signal, sessionId });
       this.throwIfAborted(signal);
       const skillSet = new Set(skillNames);
       const matchedSkill = skills.filter((skill) => skillSet.has(skill.name));
@@ -1159,10 +983,7 @@ ${skillMd}
         userPrompt.skills = matchedSkill;
       }
     }
-    userPrompt.skills = await this.normalizeSkills(
-      userPrompt.skills,
-      sessionId,
-    );
+    userPrompt.skills = await this.normalizeSkills(userPrompt.skills, sessionId);
     this.throwIfAborted(signal);
 
     const userMessage = this.buildUserMessage(sessionId, userPrompt);
@@ -1173,19 +994,12 @@ ${skillMd}
         if (skill.isLoaded) {
           continue;
         }
-        const skillMd = fs.readFileSync(
-          this.resolveSkillPath(skill.path),
-          "utf8",
-        );
+        const skillMd = fs.readFileSync(this.resolveSkillPath(skill.path), "utf8");
         const skillPrompt = `Use the skill document below to assist the user:\n
 <${skill.name}-skill path="${this.resolveSkillPath(skill.path)}">
 ${skillMd}
 </${skill.name}-skill>`;
-        const skillMessage = this.buildSkillMessage(
-          sessionId,
-          skillPrompt,
-          skill,
-        );
+        const skillMessage = this.buildSkillMessage(sessionId, skillPrompt, skill);
         this.appendSessionMessage(sessionId, skillMessage);
         this.onAssistantMessage(skillMessage, true);
       }
@@ -1194,21 +1008,10 @@ ${skillMd}
     await this.activateSession(sessionId, controller);
   }
 
-  async activateSession(
-    sessionId: string,
-    controller?: AbortController,
-  ): Promise<void> {
+  async activateSession(sessionId: string, controller?: AbortController): Promise<void> {
     const startedAt = Date.now();
-    const {
-      client,
-      model,
-      baseURL,
-      thinkingEnabled,
-      reasoningEffort,
-      debugLogEnabled,
-      notify,
-      env,
-    } = this.createOpenAIClient();
+    const { client, model, baseURL, thinkingEnabled, reasoningEffort, debugLogEnabled, notify, env } =
+      this.createOpenAIClient();
     const now = new Date().toISOString();
 
     if (!client) {
@@ -1260,16 +1063,11 @@ ${skillMd}
         }
 
         const session = this.getSession(sessionId);
-        if (
-          session == null ||
-          session.status === "interrupted" ||
-          session.status === "failed"
-        ) {
+        if (session == null || session.status === "interrupted" || session.status === "failed") {
           return;
         }
 
-        const compactPromptTokenThreshold =
-          getCompactPromptTokenThreshold(model);
+        const compactPromptTokenThreshold = getCompactPromptTokenThreshold(model);
         if (session.activeTokens > compactPromptTokenThreshold) {
           const message = this.buildAssistantMessage(
             sessionId,
@@ -1281,25 +1079,14 @@ ${skillMd}
           await this.compactSession(sessionId, sessionController.signal);
         }
 
-        const messages = this.buildOpenAIMessages(
-          this.listSessionMessages(sessionId),
-          thinkingEnabled,
-          model,
-        );
-        const thinkingOptions = buildThinkingRequestOptions(
-          thinkingEnabled,
-          baseURL,
-          reasoningEffort,
-        );
+        const messages = this.buildOpenAIMessages(this.listSessionMessages(sessionId), thinkingEnabled, model);
+        const thinkingOptions = buildThinkingRequestOptions(thinkingEnabled, baseURL, reasoningEffort);
         const response = await this.createChatCompletionStream(
           client,
           {
             model,
             messages,
-            tools: getTools(
-              this.getPromptToolOptions(),
-              this.mcpToolDefinitions,
-            ),
+            tools: getTools(this.getPromptToolOptions(), this.mcpToolDefinitions),
             ...thinkingOptions,
           },
           { signal: sessionController.signal },
@@ -1315,39 +1102,23 @@ ${skillMd}
         const message = response.choices?.[0]?.message;
         const rawContent = message?.content;
         const content = typeof rawContent === "string" ? rawContent : "";
-        const rawToolCalls =
-          (message as { tool_calls?: unknown[] } | undefined)?.tool_calls ??
-          null;
-        toolCalls =
-          Array.isArray(rawToolCalls) && rawToolCalls.length > 0
-            ? rawToolCalls
-            : null;
-        const rawThinking = (
-          message as { reasoning_content?: unknown } | undefined
-        )?.reasoning_content;
+        const rawToolCalls = (message as { tool_calls?: unknown[] } | undefined)?.tool_calls ?? null;
+        toolCalls = Array.isArray(rawToolCalls) && rawToolCalls.length > 0 ? rawToolCalls : null;
+        const rawThinking = (message as { reasoning_content?: unknown } | undefined)?.reasoning_content;
         const thinking = typeof rawThinking === "string" ? rawThinking : null;
-        const refusal =
-          (message as { refusal?: string } | undefined)?.refusal ?? null;
+        const refusal = (message as { refusal?: string } | undefined)?.refusal ?? null;
         // const html = content ? this.renderMarkdown(content) : "";
 
         if (this.isInterrupted(sessionId)) {
           return;
         }
-        const assistantMessage = this.buildAssistantMessage(
-          sessionId,
-          content,
-          toolCalls,
-          thinking,
-        );
+        const assistantMessage = this.buildAssistantMessage(sessionId, content, toolCalls, thinking);
         this.appendSessionMessage(sessionId, assistantMessage);
         this.onAssistantMessage(assistantMessage, !!toolCalls);
 
         let waitingForUser = false;
         if (toolCalls) {
-          const toolAppendResult = await this.appendToolMessages(
-            sessionId,
-            toolCalls,
-          );
+          const toolAppendResult = await this.appendToolMessages(sessionId, toolCalls);
           waitingForUser = toolAppendResult.waitingForUser;
         }
 
@@ -1364,13 +1135,7 @@ ${skillMd}
           toolCalls,
           usage: accumulateUsage(entry.usage, responseUsage),
           activeTokens: getTotalTokens(responseUsage),
-          status: refusal
-            ? "failed"
-            : waitingForUser
-              ? "waiting_for_user"
-              : toolCalls
-                ? "processing"
-                : "completed",
+          status: refusal ? "failed" : waitingForUser ? "waiting_for_user" : toolCalls ? "processing" : "completed",
           failReason: refusal ? refusal : entry.failReason,
           updateTime: new Date().toISOString(),
         }));
@@ -1403,8 +1168,7 @@ ${skillMd}
       );
     } catch (error) {
       const errMessage = error instanceof Error ? error.message : String(error);
-      const aborted =
-        this.isAbortLikeError(error) || sessionController.signal.aborted;
+      const aborted = this.isAbortLikeError(error) || sessionController.signal.aborted;
       this.updateSessionEntry(sessionId, (entry) => ({
         ...entry,
         status: aborted ? "interrupted" : "failed",
@@ -1413,14 +1177,7 @@ ${skillMd}
       }));
 
       if (!aborted) {
-        this.onAssistantMessage(
-          this.buildAssistantMessage(
-            sessionId,
-            `Request failed: ${errMessage}`,
-            null,
-          ),
-          false,
-        );
+        this.onAssistantMessage(this.buildAssistantMessage(sessionId, `Request failed: ${errMessage}`, null), false);
       }
     } finally {
       if (this.sessionControllers.get(sessionId) === sessionController) {
@@ -1432,32 +1189,21 @@ ${skillMd}
 
   async compactSession(sessionId: string, signal?: AbortSignal): Promise<void> {
     this.throwIfAborted(signal);
-    const {
-      client,
-      model,
-      baseURL,
-      thinkingEnabled,
-      reasoningEffort,
-      debugLogEnabled,
-    } = this.createOpenAIClient();
+    const { client, model, baseURL, thinkingEnabled, reasoningEffort, debugLogEnabled } = this.createOpenAIClient();
     if (!client) {
       return;
     }
-    const sessionMessages = this.listSessionMessages(sessionId).filter(
-      (message) => !message.compacted,
-    );
+    const sessionMessages = this.listSessionMessages(sessionId).filter((message) => !message.compacted);
     if (sessionMessages.length === 0) {
       return;
     }
 
-    let startIndex = sessionMessages.findIndex(
-      (message) => message.role !== "system",
-    );
+    let startIndex = sessionMessages.findIndex((message) => message.role !== "system");
     if (startIndex === -1) {
       return;
     }
 
-    // Skip leading orphan tool messages (paired assistant was removed in last round of compression)
+    // Skip leading orphaned tool messages (the paired assistant messages were removed in the previous compression round)
     while (
       startIndex < sessionMessages.length &&
       sessionMessages[startIndex].role === "tool"
@@ -1468,15 +1214,9 @@ ${skillMd}
       return;
     }
 
-    const searchStart = Math.floor(
-      startIndex + ((sessionMessages.length - startIndex) * 2) / 3,
-    );
+    const searchStart = Math.floor(startIndex + ((sessionMessages.length - startIndex) * 2) / 3);
     let endIndex = -1;
-    for (
-      let i = Math.max(searchStart, startIndex);
-      i < sessionMessages.length;
-      i += 1
-    ) {
+    for (let i = Math.max(searchStart, startIndex); i < sessionMessages.length; i += 1) {
       if (sessionMessages[i].role !== "tool") {
         endIndex = i;
         break;
@@ -1486,14 +1226,8 @@ ${skillMd}
       return;
     }
 
-    const compactPrompt = getCompactPrompt(
-      sessionMessages.slice(startIndex, endIndex),
-    );
-    const thinkingOptions = buildThinkingRequestOptions(
-      thinkingEnabled,
-      baseURL,
-      reasoningEffort,
-    );
+    const compactPrompt = getCompactPrompt(sessionMessages.slice(startIndex, endIndex));
+    const thinkingOptions = buildThinkingRequestOptions(thinkingEnabled, baseURL, reasoningEffort);
     const response = await this.createChatCompletionStream(
       client,
       {
@@ -1512,11 +1246,8 @@ ${skillMd}
     );
     this.throwIfAborted(signal);
     const rawLlmResponse = response.choices?.[0]?.message?.content;
-    const llmResponse =
-      typeof rawLlmResponse === "string" ? rawLlmResponse : "";
-    const compactedSummary = llmResponse
-      .replace(/<analysis>[\s\S]*?<\/analysis>/gi, "")
-      .trim();
+    const llmResponse = typeof rawLlmResponse === "string" ? rawLlmResponse : "";
+    const compactedSummary = llmResponse.replace(/<analysis>[\s\S]*?<\/analysis>/gi, "").trim();
 
     const now = new Date().toISOString();
     const responseUsage = response.usage ?? null;
@@ -1528,11 +1259,7 @@ ${skillMd}
     }));
 
     for (let i = startIndex; i < endIndex; i += 1) {
-      sessionMessages[i] = {
-        ...sessionMessages[i],
-        compacted: true,
-        updateTime: now,
-      };
+      sessionMessages[i] = { ...sessionMessages[i], compacted: true, updateTime: now };
     }
 
     // ── LazyTrit finalize: resolve accumulated TC history ─────────────
@@ -1569,6 +1296,7 @@ ${skillMd}
       webSearchEnabled: true,
     };
   }
+
 
   interruptActiveSession(): void {
     const controller = this.activePromptController;
@@ -1624,10 +1352,7 @@ ${skillMd}
       contentParts.push(`Failed to kill processes: ${failedPids.join(", ")}.`);
     }
 
-    this.onAssistantMessage(
-      this.buildUserMessage(sessionId, { text: contentParts.join(" ") }),
-      false,
-    );
+    this.onAssistantMessage(this.buildUserMessage(sessionId, { text: contentParts.join(" ") }), false);
   }
 
   private isInterrupted(sessionId: string): boolean {
@@ -1648,8 +1373,7 @@ ${skillMd}
     // Clear code index cache
     try {
       import("./tools/code-index-handler").then((m) => {
-        if (typeof (m as any).clearIndexCache === "function")
-          (m as any).clearIndexCache();
+        if (typeof (m as any).clearIndexCache === "function") (m as any).clearIndexCache();
       });
     } catch {
       /* ignore */
@@ -1657,8 +1381,7 @@ ${skillMd}
     // Clear in-memory state tracking
     try {
       import("./common/state").then((m) => {
-        if (typeof (m as any).clearAllState === "function")
-          (m as any).clearAllState();
+        if (typeof (m as any).clearAllState === "function") (m as any).clearAllState();
       });
     } catch {
       /* ignore */
@@ -1680,6 +1403,28 @@ ${skillMd}
       /* ignore */
     }
     return true;
+  }
+
+  renameSession(sessionId: string, newSummary: string): boolean {
+    const updated = this.updateSessionEntry(sessionId, (entry) => ({
+      ...entry,
+      summary: newSummary || entry.summary,
+      updateTime: new Date().toISOString(),
+    }));
+    return updated !== null;
+  }
+
+  exportSession(sessionId: string, outPath?: string): string {
+    const messages = this.listSessionMessages(sessionId);
+    const resolvedPath = outPath ?? path.join(this.projectRoot, `session-${sessionId.substring(0, 8)}.md`);
+    const md = messages
+      .map(
+        (m) =>
+          `## ${m.role}\n\n${typeof m.content === "string" ? m.content : JSON.stringify(m.content, null, 2)}`,
+      )
+      .join("\n\n");
+    fs.writeFileSync(resolvedPath, md, "utf8");
+    return resolvedPath;
   }
 
   listSessionMessages(sessionId: string): SessionMessage[] {
@@ -1708,27 +1453,19 @@ ${skillMd}
     }
 
     const nextMeta = message.meta ? { ...message.meta } : undefined;
-    const normalizedParamsMd = this.buildToolParamsSnippet(
-      nextMeta?.function ?? null,
-    );
+    const normalizedParamsMd = this.buildToolParamsSnippet(nextMeta?.function ?? null);
     if (nextMeta && normalizedParamsMd) {
       nextMeta.paramsMd = normalizedParamsMd;
     }
 
-    const normalizedResultMd =
-      typeof message.content === "string"
-        ? this.buildToolResultSnippet(message.content)
-        : "";
+    const normalizedResultMd = typeof message.content === "string" ? this.buildToolResultSnippet(message.content) : "";
     if (nextMeta && normalizedResultMd) {
       nextMeta.resultMd = normalizedResultMd;
     }
 
     return {
       ...message,
-      visible:
-        typeof message.content === "string"
-          ? !this.isInvisibleExecution(message.content)
-          : message.visible,
+      visible: typeof message.content === "string" ? !this.isInvisibleExecution(message.content) : message.visible,
       meta: nextMeta,
     };
   }
@@ -1743,12 +1480,7 @@ ${skillMd}
     sessionsIndexPath: string;
   } {
     const projectCode = this.getProjectCode(this.projectRoot);
-    const projectDir = path.join(
-      os.homedir(),
-      ".hex4code",
-      "projects",
-      projectCode,
-    );
+    const projectDir = path.join(os.homedir(), ".hex4code", "projects", projectCode);
     const sessionsIndexPath = path.join(projectDir, "sessions-index.json");
     return { projectCode, projectDir, sessionsIndexPath };
   }
@@ -1794,11 +1526,7 @@ ${skillMd}
       })),
       originalPath: this.projectRoot,
     };
-    fs.writeFileSync(
-      sessionsIndexPath,
-      JSON.stringify(normalized, null, 2),
-      "utf8",
-    );
+    fs.writeFileSync(sessionsIndexPath, JSON.stringify(normalized, null, 2), "utf8");
   }
 
   private getSessionMessagesPath(sessionId: string): string {
@@ -1819,35 +1547,22 @@ ${skillMd}
     }
   }
 
-  private appendSessionMessage(
-    sessionId: string,
-    message: SessionMessage,
-  ): void {
+  private appendSessionMessage(sessionId: string, message: SessionMessage): void {
     this.ensureProjectDir();
     const messagePath = this.getSessionMessagesPath(sessionId);
     fs.appendFileSync(messagePath, `${JSON.stringify(message)}\n`, "utf8");
   }
 
-  private saveSessionMessages(
-    sessionId: string,
-    messages: SessionMessage[],
-  ): void {
+  private saveSessionMessages(sessionId: string, messages: SessionMessage[]): void {
     this.ensureProjectDir();
     const messagePath = this.getSessionMessagesPath(sessionId);
-    const payload = messages
-      .map((message) => JSON.stringify(message))
-      .join("\n");
+    const payload = messages.map((message) => JSON.stringify(message)).join("\n");
     fs.writeFileSync(messagePath, payload ? `${payload}\n` : "", "utf8");
   }
 
-  private updateSessionEntry(
-    sessionId: string,
-    updater: (entry: SessionEntry) => SessionEntry,
-  ): SessionEntry | null {
+  private updateSessionEntry(sessionId: string, updater: (entry: SessionEntry) => SessionEntry): SessionEntry | null {
     const index = this.loadSessionsIndex();
-    const entryIndex = index.entries.findIndex(
-      (entry) => entry.id === sessionId,
-    );
+    const entryIndex = index.entries.findIndex((entry) => entry.id === sessionId);
     if (entryIndex === -1) {
       return null;
     }
@@ -1859,10 +1574,7 @@ ${skillMd}
     return updated;
   }
 
-  private buildUserMessage(
-    sessionId: string,
-    prompt: UserPromptContent,
-  ): SessionMessage {
+  private buildUserMessage(sessionId: string, prompt: UserPromptContent): SessionMessage {
     const now = new Date().toISOString();
     const imageParams =
       prompt.imageUrls
@@ -1872,15 +1584,7 @@ ${skillMd}
           image_url: { url },
         })) ?? [];
 
-    let content = prompt.text ?? "";
-    if (prompt.activeFile?.path) {
-      const fileInfo = `[active file: ${prompt.activeFile.path}]`;
-      if (prompt.activeFile.content) {
-        content = `${fileInfo}\n\`\`\`\n${prompt.activeFile.content}\n\`\`\`\n${content}`;
-      } else {
-        content = content ? `${fileInfo}\n${content}` : fileInfo;
-      }
-    }
+    const content = prompt.text ?? "";
 
     return {
       id: crypto.randomUUID(),
@@ -1893,16 +1597,14 @@ ${skillMd}
       visible: true,
       createTime: now,
       updateTime: now,
+      meta: prompt.activeFile?.path
+        ? { activeFile: { path: prompt.activeFile.path, content: prompt.activeFile.content } }
+        : undefined,
     };
   }
 
   private renderInitCommandPrompt(): string {
-    const templatePath = path.join(
-      getExtensionRoot(),
-      "templates",
-      "prompts",
-      "init_command.md.ejs",
-    );
+    const templatePath = path.join(getExtensionRoot(), "templates", "prompts", "init_command.md.ejs");
     const template = fs.readFileSync(templatePath, "utf8");
     return ejs.render(template, {
       agentsMdFile: this.getEffectiveProjectAgentsMdFile(),
@@ -1913,10 +1615,7 @@ ${skillMd}
     return this.loadProjectAgentInstructions()?.displayPath ?? null;
   }
 
-  private loadProjectAgentInstructions(): {
-    content: string;
-    displayPath: string;
-  } | null {
+  private loadProjectAgentInstructions(): { content: string; displayPath: string } | null {
     const candidatePaths = [
       {
         absolutePath: path.join(this.projectRoot, ".hex4code", "AGENTS.md"),
@@ -1959,9 +1658,7 @@ ${skillMd}
       return projectInstructions.content;
     }
 
-    return this.readNonEmptyFile(
-      path.join(os.homedir(), ".hex4code", "AGENTS.md"),
-    );
+    return this.readNonEmptyFile(path.join(os.homedir(), ".hex4code", "AGENTS.md"));
   }
 
   private buildSystemMessage(
@@ -1987,11 +1684,7 @@ ${skillMd}
     };
   }
 
-  private buildSkillMessage(
-    sessionId: string,
-    content: string,
-    skill: SkillInfo,
-  ): SessionMessage {
+  private buildSkillMessage(sessionId: string, content: string, skill: SkillInfo): SessionMessage {
     const now = new Date().toISOString();
     return {
       id: crypto.randomUUID(),
@@ -2016,10 +1709,8 @@ ${skillMd}
   ): SessionMessage {
     const now = new Date().toISOString();
     const hasReasoningContent = reasoningContent != null;
-    const messageParams: {
-      tool_calls?: unknown[];
-      reasoning_content?: string;
-    } | null = toolCalls || hasReasoningContent ? {} : null;
+    const messageParams: { tool_calls?: unknown[]; reasoning_content?: string } | null =
+      toolCalls || hasReasoningContent ? {} : null;
     if (toolCalls) {
       // Filter out any tool_call that lacks a valid id to prevent
       // downstream buildOpenAIMessages 400 errors from missing pairings.
@@ -2045,10 +1736,7 @@ ${skillMd}
       visible: (content || reasoningContent || "").trim() ? true : false,
       createTime: now,
       updateTime: now,
-      meta:
-        toolCalls || (hasReasoningContent && !(content || "").trim())
-          ? { asThinking: true }
-          : undefined,
+      meta: (toolCalls || (hasReasoningContent && !(content || "").trim())) ? { asThinking: true } : undefined,
     };
   }
 
@@ -2081,20 +1769,12 @@ ${skillMd}
     };
   }
 
-  private async appendToolMessages(
-    sessionId: string,
-    toolCalls: unknown[],
-  ): Promise<{ waitingForUser: boolean }> {
-    const toolExecutions = await this.toolExecutor.executeToolCalls(
-      sessionId,
-      toolCalls,
-      {
-        onProcessStart: (pid, command) =>
-          this.addSessionProcess(sessionId, pid, command),
-        onProcessExit: (pid) => this.removeSessionProcess(sessionId, pid),
-        shouldStop: () => this.isInterrupted(sessionId),
-      },
-    );
+  private async appendToolMessages(sessionId: string, toolCalls: unknown[]): Promise<{ waitingForUser: boolean }> {
+    const toolExecutions = await this.toolExecutor.executeToolCalls(sessionId, toolCalls, {
+      onProcessStart: (pid, command) => this.addSessionProcess(sessionId, pid, command),
+      onProcessExit: (pid) => this.removeSessionProcess(sessionId, pid),
+      shouldStop: () => this.isInterrupted(sessionId),
+    });
     if (this.isInterrupted(sessionId)) {
       return { waitingForUser: false };
     }
@@ -2104,16 +1784,8 @@ ${skillMd}
       if (execution.result.awaitUserResponse === true) {
         waitingForUser = true;
       }
-      const toolFunction = this.findToolFunction(
-        toolCalls,
-        execution.toolCallId,
-      );
-      const toolMessage = this.buildToolMessage(
-        sessionId,
-        execution.toolCallId,
-        execution.content,
-        toolFunction,
-      );
+      const toolFunction = this.findToolFunction(toolCalls, execution.toolCallId);
+      const toolMessage = this.buildToolMessage(sessionId, execution.toolCallId, execution.content, toolFunction);
       this.appendSessionMessage(sessionId, toolMessage);
       this.onAssistantMessage(toolMessage, true);
 
@@ -2122,11 +1794,7 @@ ${skillMd}
           continue;
         }
         followUpMessages.push(
-          this.buildSystemMessage(
-            sessionId,
-            followUpMessage.content,
-            followUpMessage.contentParams ?? null,
-          ),
+          this.buildSystemMessage(sessionId, followUpMessage.content, followUpMessage.contentParams ?? null),
         );
       }
     }
@@ -2149,11 +1817,7 @@ ${skillMd}
         false,
       );
       // LazyTrit: store TC history for deferred resolution during compact
-      this.turnTcHistory.push({
-        turnTc,
-        chain: turnTcStates,
-        timestamp: Date.now(),
-      });
+      this.turnTcHistory.push({ turnTc, chain: turnTcStates, timestamp: Date.now() });
     }
 
     // ── Pipeline summary injection ───────────────────────────────────
@@ -2180,42 +1844,28 @@ ${skillMd}
         continue;
       }
 
-      openAIMessages.push(
-        this.sessionMessageToOpenAIMessage(message, thinkingEnabled, model),
-      );
+      openAIMessages.push(this.sessionMessageToOpenAIMessage(message, thinkingEnabled, model));
 
       const toolCalls = this.getAssistantToolCalls(message);
       if (toolCalls.length === 0) {
         continue;
       }
 
-      for (
-        let toolCallIndex = 0;
-        toolCallIndex < toolCalls.length;
-        toolCallIndex += 1
-      ) {
+      for (let toolCallIndex = 0; toolCallIndex < toolCalls.length; toolCallIndex += 1) {
         const toolCallId = this.getToolCallId(toolCalls[toolCallIndex]);
         if (!toolCallId) {
           continue;
         }
 
-        const pairedToolIndex = toolPairings.get(
-          this.buildToolPairingKey(index, toolCallIndex),
-        );
+        const pairedToolIndex = toolPairings.get(this.buildToolPairingKey(index, toolCallIndex));
         if (pairedToolIndex != null) {
           openAIMessages.push(
-            this.sessionMessageToOpenAIMessage(
-              activeMessages[pairedToolIndex],
-              thinkingEnabled,
-              model,
-            ),
+            this.sessionMessageToOpenAIMessage(activeMessages[pairedToolIndex], thinkingEnabled, model),
           );
           continue;
         }
 
-        openAIMessages.push(
-          this.buildInterruptedOpenAIToolMessage(toolCalls, toolCallId),
-        );
+        openAIMessages.push(this.buildInterruptedOpenAIToolMessage(toolCalls, toolCallId));
       }
     }
 
@@ -2234,51 +1884,37 @@ ${skillMd}
     } as ChatCompletionMessageParam;
 
     const messageParams = message.messageParams as
-      | {
-          tool_calls?: unknown[];
-          tool_call_id?: string;
-          reasoning_content?: string;
-        }
+      | { tool_calls?: unknown[]; tool_call_id?: string; reasoning_content?: string }
       | null
       | undefined;
     if (messageParams?.tool_calls) {
-      (base as { tool_calls?: unknown[] }).tool_calls =
-        messageParams.tool_calls;
+      (base as { tool_calls?: unknown[] }).tool_calls = messageParams.tool_calls;
     }
     if (messageParams?.tool_call_id) {
-      (base as { tool_call_id?: string }).tool_call_id =
-        messageParams.tool_call_id;
+      (base as { tool_call_id?: string }).tool_call_id = messageParams.tool_call_id;
     }
     if (typeof messageParams?.reasoning_content === "string") {
-      (base as { reasoning_content?: string }).reasoning_content =
-        messageParams.reasoning_content;
+      (base as { reasoning_content?: string }).reasoning_content = messageParams.reasoning_content;
     } else if (thinkingEnabled && message.role === "assistant") {
       // Thinking-mode providers require every replayed assistant message
       // to include the reasoning_content field, even when it is empty.
       (base as { reasoning_content?: string }).reasoning_content = "";
     }
 
-    if (
-      (message.role === "user" || message.role === "system") &&
-      message.contentParams
-    ) {
+    if ((message.role === "user" || message.role === "system") && message.contentParams) {
       const contentParts: ChatCompletionContentPart[] = [];
       if (content) {
         contentParts.push({ type: "text", text: content });
       }
-      const params = Array.isArray(message.contentParams)
-        ? message.contentParams
-        : [message.contentParams];
+      const params = Array.isArray(message.contentParams) ? message.contentParams : [message.contentParams];
       for (const param of params) {
         const part = param as ChatCompletionContentPart;
         if (part && (part.type !== "image_url" || supportsMultimodal(model))) {
           contentParts.push(part);
         }
       }
-      const contentValue: string | ChatCompletionContentPart[] =
-        contentParts.length > 0 ? contentParts : content;
-      (base as { content: string | ChatCompletionContentPart[] }).content =
-        contentValue;
+      const contentValue: string | ChatCompletionContentPart[] = contentParts.length > 0 ? contentParts : content;
+      (base as { content: string | ChatCompletionContentPart[] }).content = contentValue;
     }
 
     return base;
@@ -2288,24 +1924,28 @@ ${skillMd}
     if (message.role === "user" && message.content === "/init") {
       return this.renderInitCommandPrompt();
     }
-    return message.content ?? "";
+
+    let content = message.content ?? "";
+
+    if (message.meta?.activeFile?.path) {
+      const fileInfo = `[active file: ${message.meta.activeFile.path}]`;
+      if (message.meta.activeFile.content) {
+        content = `${fileInfo}\n\`\`\`\n${message.meta.activeFile.content}\n\`\`\`\n${content}`;
+      } else {
+        content = content ? `${fileInfo}\n${content}` : fileInfo;
+      }
+    }
+
+    return content;
   }
 
   private pairToolMessages(messages: SessionMessage[]): Map<string, number> {
     const pairings = new Map<string, number>();
     const usedToolMessageIndexes = new Set<number>();
 
-    for (
-      let assistantIndex = 0;
-      assistantIndex < messages.length;
-      assistantIndex += 1
-    ) {
+    for (let assistantIndex = 0; assistantIndex < messages.length; assistantIndex += 1) {
       const toolCalls = this.getAssistantToolCalls(messages[assistantIndex]);
-      for (
-        let toolCallIndex = 0;
-        toolCallIndex < toolCalls.length;
-        toolCallIndex += 1
-      ) {
+      for (let toolCallIndex = 0; toolCallIndex < toolCalls.length; toolCallIndex += 1) {
         const toolCallId = this.getToolCallId(toolCalls[toolCallIndex]);
         if (!toolCallId) {
           continue;
@@ -2322,10 +1962,7 @@ ${skillMd}
         }
 
         usedToolMessageIndexes.add(toolIndex);
-        pairings.set(
-          this.buildToolPairingKey(assistantIndex, toolCallIndex),
-          toolIndex,
-        );
+        pairings.set(this.buildToolPairingKey(assistantIndex, toolCallIndex), toolIndex);
       }
     }
 
@@ -2364,12 +2001,8 @@ ${skillMd}
     if (message.role !== "assistant") {
       return [];
     }
-    const messageParams = message.messageParams as {
-      tool_calls?: unknown[];
-    } | null;
-    return Array.isArray(messageParams?.tool_calls)
-      ? messageParams.tool_calls
-      : [];
+    const messageParams = message.messageParams as { tool_calls?: unknown[] } | null;
+    return Array.isArray(messageParams?.tool_calls) ? messageParams.tool_calls : [];
   }
 
   private getToolCallId(toolCall: unknown): string | null {
@@ -2381,17 +2014,12 @@ ${skillMd}
   }
 
   private getToolMessageCallId(message: SessionMessage): string | null {
-    const messageParams = message.messageParams as {
-      tool_call_id?: unknown;
-    } | null;
+    const messageParams = message.messageParams as { tool_call_id?: unknown } | null;
     const toolCallId = messageParams?.tool_call_id;
     return typeof toolCallId === "string" && toolCallId ? toolCallId : null;
   }
 
-  private buildToolPairingKey(
-    assistantIndex: number,
-    toolCallIndex: number,
-  ): string {
+  private buildToolPairingKey(assistantIndex: number, toolCallIndex: number): string {
     return `${assistantIndex}:${toolCallIndex}`;
   }
 
@@ -2400,34 +2028,23 @@ ${skillMd}
       return false;
     }
     try {
-      const parsed = JSON.parse(message.content) as {
-        metadata?: { interrupted?: unknown };
-      };
+      const parsed = JSON.parse(message.content) as { metadata?: { interrupted?: unknown } };
       return parsed.metadata?.interrupted === true;
     } catch {
       return false;
     }
   }
 
-  private buildInterruptedOpenAIToolMessage(
-    toolCalls: unknown[],
-    toolCallId: string,
-  ): ChatCompletionMessageParam {
+  private buildInterruptedOpenAIToolMessage(toolCalls: unknown[], toolCallId: string): ChatCompletionMessageParam {
     const toolFunction = this.findToolFunction(toolCalls, toolCallId);
     return {
       role: "tool",
-      content: this.buildInterruptedToolResult(
-        toolFunction,
-        "Previous tool call did not complete.",
-      ),
+      content: this.buildInterruptedToolResult(toolFunction, "Previous tool call did not complete."),
       tool_call_id: toolCallId,
     } as ChatCompletionMessageParam;
   }
 
-  private findToolFunction(
-    toolCalls: unknown[],
-    toolCallId: string,
-  ): unknown | null {
+  private findToolFunction(toolCalls: unknown[], toolCallId: string): unknown | null {
     for (const toolCall of toolCalls) {
       if (!toolCall || typeof toolCall !== "object") {
         continue;
@@ -2467,15 +2084,10 @@ ${skillMd}
     return trimmed;
   }
 
-  private formatToolParamsSnippet(
-    toolName: string | null,
-    args: Record<string, unknown>,
-  ): string {
+  private formatToolParamsSnippet(toolName: string | null, args: Record<string, unknown>): string {
     if (toolName === "bash") {
-      const command =
-        typeof args.command === "string" ? args.command.trim() : "";
-      const description =
-        typeof args.description === "string" ? args.description.trim() : "";
+      const command = typeof args.command === "string" ? args.command.trim() : "";
+      const description = typeof args.description === "string" ? args.description.trim() : "";
       if (command && description) {
         return `${command}  # ${description}`;
       }
@@ -2514,10 +2126,7 @@ ${skillMd}
         if (typeof parsed.output === "string") {
           return this.formatToolResultSnippet(parsed.output, maxLength);
         }
-        return this.formatToolResultSnippet(
-          JSON.stringify(parsed.output),
-          maxLength,
-        );
+        return this.formatToolResultSnippet(JSON.stringify(parsed.output), maxLength);
       }
     } catch {
       // fall back to raw content
@@ -2556,27 +2165,14 @@ ${skillMd}
     }
 
     const session = this.getSession(sessionId);
-    if (
-      !session ||
-      (session.status !== "completed" && session.status !== "failed")
-    ) {
+    if (!session || (session.status !== "completed" && session.status !== "failed")) {
       return;
     }
 
-    launchNotifyScript(
-      notifyCommand,
-      Date.now() - startedAt,
-      this.projectRoot,
-      undefined,
-      configuredEnv,
-    );
+    launchNotifyScript(notifyCommand, Date.now() - startedAt, this.projectRoot, undefined, configuredEnv);
   }
 
-  private addSessionProcess(
-    sessionId: string,
-    processId: string | number,
-    command: string,
-  ): void {
+  private addSessionProcess(sessionId: string, processId: string | number, command: string): void {
     const now = new Date().toISOString();
     this.updateSessionEntry(sessionId, (entry) => {
       const processes = new Map(entry.processes ?? []);
@@ -2589,10 +2185,7 @@ ${skillMd}
     });
   }
 
-  private removeSessionProcess(
-    sessionId: string,
-    processId: string | number,
-  ): void {
+  private removeSessionProcess(sessionId: string, processId: string | number): void {
     const now = new Date().toISOString();
     this.updateSessionEntry(sessionId, (entry) => {
       const processes = new Map(entry.processes ?? []);
@@ -2605,9 +2198,7 @@ ${skillMd}
     });
   }
 
-  private getProcessIds(
-    processes: Map<string, { startTime: string; command: string }> | null,
-  ): number[] {
+  private getProcessIds(processes: Map<string, { startTime: string; command: string }> | null): number[] {
     if (!processes) {
       return [];
     }
@@ -2621,14 +2212,9 @@ ${skillMd}
     return ids;
   }
 
-  private buildInterruptedToolResult(
-    toolFunction: unknown | null,
-    reason: string,
-  ): string {
+  private buildInterruptedToolResult(toolFunction: unknown | null, reason: string): string {
     const toolName =
-      toolFunction &&
-      typeof toolFunction === "object" &&
-      typeof (toolFunction as { name?: unknown }).name === "string"
+      toolFunction && typeof toolFunction === "object" && typeof (toolFunction as { name?: unknown }).name === "string"
         ? (toolFunction as { name: string }).name
         : "tool";
     return JSON.stringify(
@@ -2658,38 +2244,20 @@ ${skillMd}
   }
 
   private normalizeSessionEntry(entry: unknown): SessionEntry {
-    const value =
-      entry && typeof entry === "object"
-        ? (entry as Record<string, unknown>)
-        : {};
+    const value = entry && typeof entry === "object" ? (entry as Record<string, unknown>) : {};
     return {
       id: typeof value.id === "string" ? value.id : crypto.randomUUID(),
       summary: typeof value.summary === "string" ? value.summary : null,
-      assistantReply:
-        typeof value.assistantReply === "string" ? value.assistantReply : null,
-      assistantThinking:
-        typeof value.assistantThinking === "string"
-          ? value.assistantThinking
-          : null,
-      assistantRefusal:
-        typeof value.assistantRefusal === "string"
-          ? value.assistantRefusal
-          : null,
+      assistantReply: typeof value.assistantReply === "string" ? value.assistantReply : null,
+      assistantThinking: typeof value.assistantThinking === "string" ? value.assistantThinking : null,
+      assistantRefusal: typeof value.assistantRefusal === "string" ? value.assistantRefusal : null,
       toolCalls: Array.isArray(value.toolCalls) ? value.toolCalls : null,
       status: this.normalizeSessionStatus(value.status),
-      failReason:
-        typeof value.failReason === "string" ? value.failReason : null,
+      failReason: typeof value.failReason === "string" ? value.failReason : null,
       usage: value.usage ?? null,
-      activeTokens:
-        typeof value.activeTokens === "number" ? value.activeTokens : 0,
-      createTime:
-        typeof value.createTime === "string"
-          ? value.createTime
-          : new Date().toISOString(),
-      updateTime:
-        typeof value.updateTime === "string"
-          ? value.updateTime
-          : new Date().toISOString(),
+      activeTokens: typeof value.activeTokens === "number" ? value.activeTokens : 0,
+      createTime: typeof value.createTime === "string" ? value.createTime : new Date().toISOString(),
+      updateTime: typeof value.updateTime === "string" ? value.updateTime : new Date().toISOString(),
       processes: this.deserializeProcesses(value.processes),
       totalCost: typeof value.totalCost === "number" ? value.totalCost : 0,
     };
@@ -2709,16 +2277,12 @@ ${skillMd}
     return "pending";
   }
 
-  private deserializeProcesses(
-    value: unknown,
-  ): Map<string, { startTime: string; command: string }> | null {
+  private deserializeProcesses(value: unknown): Map<string, { startTime: string; command: string }> | null {
     if (!value || typeof value !== "object") {
       return null;
     }
     const processes = new Map<string, { startTime: string; command: string }>();
-    for (const [pid, entry] of Object.entries(
-      value as Record<string, unknown>,
-    )) {
+    for (const [pid, entry] of Object.entries(value as Record<string, unknown>)) {
       if (!pid) {
         continue;
       }
@@ -2727,12 +2291,8 @@ ${skillMd}
         processes.set(pid, { startTime: entry, command: "Running process..." });
       } else if (typeof entry === "object" && entry !== null) {
         const obj = entry as { startTime?: unknown; command?: unknown };
-        const startTime =
-          typeof obj.startTime === "string"
-            ? obj.startTime
-            : new Date().toISOString();
-        const command =
-          typeof obj.command === "string" ? obj.command : "Running process...";
+        const startTime = typeof obj.startTime === "string" ? obj.startTime : new Date().toISOString();
+        const command = typeof obj.command === "string" ? obj.command : "Running process...";
         processes.set(pid, { startTime, command });
       }
     }
@@ -2745,8 +2305,7 @@ ${skillMd}
     if (!processes || processes.size === 0) {
       return null;
     }
-    const serialized: Record<string, { startTime: string; command: string }> =
-      {};
+    const serialized: Record<string, { startTime: string; command: string }> = {};
     for (const [pid, entry] of processes.entries()) {
       serialized[pid] = entry;
     }
@@ -2754,11 +2313,7 @@ ${skillMd}
   }
 
   /** Get the current TC (Trust Chain) status for visualization */
-  getTcStatus(): {
-    turnCount: number;
-    recentTc: TCType | null;
-    historySummary: string;
-  } {
+  getTcStatus(): { turnCount: number; recentTc: TCType | null; historySummary: string } {
     const count = this.turnTcHistory.length;
     const recentTc = count > 0 ? this.turnTcHistory[count - 1].turnTc : null;
     const statusIcons: Record<string, string> = {
@@ -2768,10 +2323,7 @@ ${skillMd}
       TC_MIXED: "~",
     };
     const icon = recentTc ? (statusIcons[recentTc] ?? "•") : "○";
-    const summary =
-      count > 0
-        ? `TC[${icon}] ${count} turns, last: ${recentTc}`
-        : "TC[○] No turns yet";
+    const summary = count > 0 ? `TC[${icon}] ${count} turns, last: ${recentTc}` : "TC[○] No turns yet";
     return { turnCount: count, recentTc, historySummary: summary };
   }
 }

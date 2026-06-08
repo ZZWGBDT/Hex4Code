@@ -72,9 +72,7 @@ const TC_LONG: Record<string, TCType> = {
 };
 
 /** Compress a tool result payload into DualTrit compact format (fewer LLM tokens). */
-export function dualTritCompress(
-  payload: Record<string, unknown>,
-): Record<string, unknown> {
+export function dualTritCompress(payload: Record<string, unknown>): Record<string, unknown> {
   const result: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(payload)) {
     const ck = COMPACT_FIELDS[key] ?? key;
@@ -84,22 +82,14 @@ export function dualTritCompress(
       result[ck] = (value as TCLink[]).map((link) => ({
         [COMPACT_FIELDS.source ?? "s"]: link.source,
         [COMPACT_FIELDS.tcState ?? "t"]: TC_SHORT[link.tc] ?? link.tc,
-        ...(link.description
-          ? { [COMPACT_FIELDS.description ?? "d"]: link.description }
-          : {}),
+        ...(link.description ? { [COMPACT_FIELDS.description ?? "d"]: link.description } : {}),
       }));
     } else if (value && typeof value === "object" && !Array.isArray(value)) {
       // Recursively compress nested objects
       result[ck] = dualTritCompress(value as Record<string, unknown>);
-    } else if (
-      Array.isArray(value) &&
-      value.length > 0 &&
-      typeof value[0] === "object"
-    ) {
+    } else if (Array.isArray(value) && value.length > 0 && typeof value[0] === "object") {
       // Compress arrays of objects
-      result[ck] = value.map((v) =>
-        dualTritCompress(v as Record<string, unknown>),
-      );
+      result[ck] = value.map((v) => dualTritCompress(v as Record<string, unknown>));
     } else {
       result[ck] = value;
     }
@@ -108,9 +98,7 @@ export function dualTritCompress(
 }
 
 /** Decompress a DualTrit compact payload back to standard tool result format. */
-export function dualTritDecompress(
-  payload: Record<string, unknown>,
-): Record<string, unknown> {
+export function dualTritDecompress(payload: Record<string, unknown>): Record<string, unknown> {
   const result: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(payload)) {
     const ek = EXPAND_FIELDS[key] ?? key;
@@ -120,9 +108,7 @@ export function dualTritDecompress(
       result[ek] = (value as Record<string, unknown>[]).map((link) => ({
         source: link[EXPAND_FIELDS.s ?? "s"] ?? link.s,
         tc: TC_LONG[link[EXPAND_FIELDS.t ?? "t"] as string] ?? link.t,
-        ...(link[EXPAND_FIELDS.d ?? "d"]
-          ? { description: link[EXPAND_FIELDS.d ?? "d"] }
-          : {}),
+        ...(link[EXPAND_FIELDS.d ?? "d"] ? { description: link[EXPAND_FIELDS.d ?? "d"] } : {}),
       }));
     } else {
       result[ek] = value;

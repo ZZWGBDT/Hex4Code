@@ -91,9 +91,7 @@ export async function handleEditTool(
     context,
     async (input) => {
       const snippetId = input.snippet_id?.trim() ?? "";
-      const snippet = snippetId
-        ? getSnippet(context.sessionId, snippetId)
-        : null;
+      const snippet = snippetId ? getSnippet(context.sessionId, snippetId) : null;
 
       let filePath = input.file_path?.trim() ?? "";
       if (!filePath && !snippet) {
@@ -190,8 +188,7 @@ export async function handleEditTool(
         return {
           ok: false,
           name: "edit",
-          error:
-            "File was only partially read. Use snippet_id or read the full file before editing.",
+          error: "File was only partially read. Use snippet_id or read the full file before editing.",
         };
       }
 
@@ -199,8 +196,7 @@ export async function handleEditTool(
         return {
           ok: false,
           name: "edit",
-          error:
-            "File has been modified since read. Read it again before editing.",
+          error: "File has been modified since read. Read it again before editing.",
         };
       }
 
@@ -211,28 +207,15 @@ export async function handleEditTool(
         const newString = input.new_string;
         const replaceAll = input.replace_all ?? false;
         const lineIndex = buildLineIndex(raw);
-        const scope = buildSearchScope(
-          filePath,
-          raw,
-          lineIndex,
-          snippet ?? null,
-        );
+        const scope = buildSearchScope(filePath, raw, lineIndex, snippet ?? null);
         let matches = findOccurrences(raw, oldString, scope);
-        let matchedVia: "exact" | "loose_escape" | "llm_escape_correction" =
-          "exact";
+        let matchedVia: "exact" | "loose_escape" | "llm_escape_correction" = "exact";
         let replacementOldString = oldString;
         let replacementNewString = newString;
 
         if (matches.length === 0) {
-          const looseEscapeMatches = findLooseEscapeMatches(
-            raw,
-            oldString,
-            scope,
-          );
-          if (
-            looseEscapeMatches.length === 1 &&
-            looseEscapeMatches[0]?.score === 1
-          ) {
+          const looseEscapeMatches = findLooseEscapeMatches(raw, oldString, scope);
+          if (looseEscapeMatches.length === 1 && looseEscapeMatches[0]?.score === 1) {
             const correctedStrings = await correctEscapedStringsWithLLM(
               raw.slice(scope.startOffset, scope.endOffset),
               oldString,
@@ -242,11 +225,7 @@ export async function handleEditTool(
             );
 
             if (correctedStrings) {
-              const correctedMatches = findOccurrences(
-                raw,
-                correctedStrings.oldString,
-                scope,
-              );
+              const correctedMatches = findOccurrences(raw, correctedStrings.oldString, scope);
               if (correctedMatches.length > 0) {
                 matches = correctedMatches;
                 matchedVia = "llm_escape_correction";
@@ -263,12 +242,7 @@ export async function handleEditTool(
         }
 
         if (matches.length === 0) {
-          const closestMatch = findClosestMatch(
-            raw,
-            oldString,
-            scope,
-            lineIndex,
-          );
+          const closestMatch = findClosestMatch(raw, oldString, scope, lineIndex);
           return {
             ok: false,
             name: "edit",
@@ -276,11 +250,7 @@ export async function handleEditTool(
             metadata: closestMatch
               ? {
                   scope: formatScopeMetadata(scope),
-                  closest_match: buildClosestMatchMetadata(
-                    context.sessionId,
-                    filePath,
-                    closestMatch,
-                  ),
+                  closest_match: buildClosestMatchMetadata(context.sessionId, filePath, closestMatch),
                 }
               : {
                   scope: formatScopeMetadata(scope),
@@ -292,17 +262,11 @@ export async function handleEditTool(
           return {
             ok: false,
             name: "edit",
-            error:
-              "old_string is not unique; use snippet_id, replace_all, or provide more context.",
+            error: "old_string is not unique; use snippet_id, replace_all, or provide more context.",
             metadata: {
               match_count: matches.length,
               scope: formatScopeMetadata(scope),
-              candidates: buildCandidateMetadata(
-                context.sessionId,
-                filePath,
-                raw,
-                matches,
-              ),
+              candidates: buildCandidateMetadata(context.sessionId, filePath, raw, matches),
             },
           };
         }
@@ -322,30 +286,14 @@ export async function handleEditTool(
             metadata: {
               match_count: matches.length,
               scope: formatScopeMetadata(scope),
-              candidates: buildCandidateMetadata(
-                context.sessionId,
-                filePath,
-                raw,
-                matches,
-              ),
+              candidates: buildCandidateMetadata(context.sessionId, filePath, raw, matches),
             },
           };
         }
 
-        const updated = applyReplacement(
-          raw,
-          replacementOldString,
-          replacementNewString,
-          matches,
-          replaceAll,
-        );
+        const updated = applyReplacement(raw, replacementOldString, replacementNewString, matches, replaceAll);
         const diffPreview = buildDiffPreview(filePath, raw, updated);
-        writeTextFile(
-          filePath,
-          updated,
-          metadata.encoding,
-          metadata.lineEndings,
-        );
+        writeTextFile(filePath, updated, metadata.encoding, metadata.lineEndings);
         const freshMetadata = readTextFileWithMetadata(filePath);
         recordFileState(context.sessionId, {
           filePath,
@@ -434,11 +382,7 @@ function buildSearchScope(
   }
 
   const safeStartLine = clamp(snippet.startLine, 1, lineIndex.lines.length);
-  const safeEndLine = clamp(
-    snippet.endLine,
-    safeStartLine,
-    lineIndex.lines.length,
-  );
+  const safeEndLine = clamp(snippet.endLine, safeStartLine, lineIndex.lines.length);
   return {
     filePath,
     startOffset: lineIndex.lineStarts[safeStartLine],
@@ -453,11 +397,7 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
-function findOccurrences(
-  raw: string,
-  needle: string,
-  scope: SearchScope,
-): MatchOccurrence[] {
+function findOccurrences(raw: string, needle: string, scope: SearchScope): MatchOccurrence[] {
   if (!raw || !needle) {
     return [];
   }
@@ -485,11 +425,7 @@ function findOccurrences(
   return matches;
 }
 
-function findLooseEscapeMatches(
-  raw: string,
-  needle: string,
-  scope: SearchScope,
-): LooseEscapeMatch[] {
+function findLooseEscapeMatches(raw: string, needle: string, scope: SearchScope): LooseEscapeMatch[] {
   if (!raw || !needle) {
     return [];
   }
@@ -549,22 +485,14 @@ function validateReplaceAllGuard(input: {
     return null;
   }
 
-  if (
-    input.expectedOccurrences !== null &&
-    input.expectedOccurrences !== input.matchCount
-  ) {
-    return (
-      `replace_all expected ${input.expectedOccurrences} occurrence(s), ` +
-      `but found ${input.matchCount}.`
-    );
+  if (input.expectedOccurrences !== null && input.expectedOccurrences !== input.matchCount) {
+    return `replace_all expected ${input.expectedOccurrences} occurrence(s), ` + `but found ${input.matchCount}.`;
   }
 
-  const isShortFragment =
-    input.oldString.trim().length < SHORT_REPLACE_ALL_LENGTH;
+  const isShortFragment = input.oldString.trim().length < SHORT_REPLACE_ALL_LENGTH;
   const needsExplicitCount =
     input.expectedOccurrences === null &&
-    (input.matchCount > REPLACE_ALL_MATCH_THRESHOLD ||
-      (isShortFragment && input.matchCount > 1));
+    (input.matchCount > REPLACE_ALL_MATCH_THRESHOLD || (isShortFragment && input.matchCount > 1));
 
   if (needsExplicitCount) {
     return (
@@ -584,11 +512,7 @@ function applyReplacement(
   replaceAll: boolean,
 ): string {
   if (!replaceAll) {
-    return (
-      raw.slice(0, matches[0].startOffset) +
-      newString +
-      raw.slice(matches[0].endOffset)
-    );
+    return raw.slice(0, matches[0].startOffset) + newString + raw.slice(matches[0].endOffset);
   }
 
   let result = "";
@@ -610,13 +534,7 @@ function buildCandidateMetadata(
 ): Array<Record<string, unknown>> {
   return matches.slice(0, MAX_CANDIDATE_COUNT).map((match) => {
     const preview = buildPreview(raw, match.startLine, match.endLine);
-    const snippet = createSnippet(
-      sessionId,
-      filePath,
-      match.startLine,
-      match.endLine,
-      preview,
-    );
+    const snippet = createSnippet(sessionId, filePath, match.startLine, match.endLine, preview);
     return {
       snippet_id: snippet?.id ?? null,
       start_line: match.startLine,
@@ -631,17 +549,8 @@ function buildClosestMatchMetadata(
   filePath: string,
   closestMatch: ClosestMatch,
 ): Record<string, unknown> {
-  const preview = formatWithLineNumbers(
-    closestMatch.text.split(/\r?\n/),
-    closestMatch.startLine,
-  );
-  const snippet = createSnippet(
-    sessionId,
-    filePath,
-    closestMatch.startLine,
-    closestMatch.endLine,
-    preview,
-  );
+  const preview = formatWithLineNumbers(closestMatch.text.split(/\r?\n/), closestMatch.startLine);
+  const snippet = createSnippet(sessionId, filePath, closestMatch.startLine, closestMatch.endLine, preview);
 
   return {
     snippet_id: snippet?.id ?? null,
@@ -669,11 +578,7 @@ function buildPreview(raw: string, startLine: number, endLine: number): string {
 }
 
 function formatWithLineNumbers(lines: string[], startLine: number): string {
-  return lines
-    .map(
-      (line, index) => `${String(startLine + index).padStart(6, " ")}\t${line}`,
-    )
-    .join("\n");
+  return lines.map((line, index) => `${String(startLine + index).padStart(6, " ")}\t${line}`).join("\n");
 }
 
 function findClosestMatch(
@@ -704,21 +609,11 @@ function findClosestMatch(
   }
 
   const targetLineCount = Math.max(1, oldString.split(/\r?\n/).length);
-  const windowSizes = Array.from(
-    new Set([
-      Math.max(1, targetLineCount - 1),
-      targetLineCount,
-      targetLineCount + 1,
-    ]),
-  );
+  const windowSizes = Array.from(new Set([Math.max(1, targetLineCount - 1), targetLineCount, targetLineCount + 1]));
   const normalizedTarget = normalizeLooseText(oldString);
 
   let bestMatch: ClosestMatch | null = null;
-  for (
-    let startLine = scope.startLine;
-    startLine <= scope.endLine;
-    startLine += 1
-  ) {
+  for (let startLine = scope.startLine; startLine <= scope.endLine; startLine += 1) {
     for (const windowSize of windowSizes) {
       const endLine = startLine + windowSize - 1;
       if (endLine > scope.endLine) {
@@ -726,10 +621,7 @@ function findClosestMatch(
       }
 
       const candidateText = sliceLines(raw, lineIndex, startLine, endLine);
-      const score = similarityScore(
-        normalizedTarget,
-        normalizeLooseText(candidateText),
-      );
+      const score = similarityScore(normalizedTarget, normalizeLooseText(candidateText));
       if (score < MIN_FUZZY_SCORE) {
         continue;
       }
@@ -794,8 +686,7 @@ async function correctEscapedStringsWithLLM(
     return null;
   }
 
-  const { client, model, baseURL, thinkingEnabled, reasoningEffort } =
-    clientFactory();
+  const { client, model, baseURL, thinkingEnabled, reasoningEffort } = clientFactory();
   if (!client) {
     return null;
   }
@@ -855,17 +746,13 @@ async function correctEscapedStringsWithLLM(
   }
 }
 
-function parseCorrectedEditStrings(
-  content: string,
-): CorrectedEditStrings | null {
+function parseCorrectedEditStrings(content: string): CorrectedEditStrings | null {
   const trimmed = content.trim();
   if (!trimmed) {
     return null;
   }
 
-  const normalized = trimmed
-    .replace(/```(?:xml)?\s*([\s\S]*?)```/i, "$1")
-    .trim();
+  const normalized = trimmed.replace(/```(?:xml)?\s*([\s\S]*?)```/i, "$1").trim();
   const oldMatch = normalized.match(
     /<corrected_old_string>(?:<!\[CDATA\[([\s\S]*?)\]\]>|([\s\S]*?))<\/corrected_old_string>/i,
   );
@@ -875,10 +762,7 @@ function parseCorrectedEditStrings(
 
   const correctedOldString = oldMatch?.[1] ?? oldMatch?.[2];
   const correctedNewString = newMatch?.[1] ?? newMatch?.[2];
-  if (
-    typeof correctedOldString === "string" &&
-    typeof correctedNewString === "string"
-  ) {
+  if (typeof correctedOldString === "string" && typeof correctedNewString === "string") {
     return {
       oldString: correctedOldString,
       newString: correctedNewString,
@@ -947,12 +831,7 @@ function toBigrams(value: string): string[] {
   return result;
 }
 
-function sliceLines(
-  raw: string,
-  lineIndex: LineIndex,
-  startLine: number,
-  endLine: number,
-): string {
+function sliceLines(raw: string, lineIndex: LineIndex, startLine: number, endLine: number): string {
   const startOffset = lineIndex.lineStarts[startLine];
   const endOffset = lineIndex.lineStarts[endLine + 1];
   return raw.slice(startOffset, endOffset);

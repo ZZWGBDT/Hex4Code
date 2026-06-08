@@ -12,4 +12,6 @@ export const AsciiLogo = [
   "██║     ██║   ██║██║  ██║██╔══╝  ",
   "╚██████╗╚██████╔╝██████╔╝███████╗",
   " ╚═════╝ ╚═════╝ ╚═════╝ ╚══════╝",
+  "With our certainty, we counter the world's entropy.",
+  "With our collaboration, we define the shape of the future.",
 ].join("\n");

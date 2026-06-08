@@ -3,7 +3,7 @@
  *
  * Two-mode architecture:
  *   "hex4"    → Pipeline orchestration + confidence propagation + compact protocol (HEX4-specific)
- *   \"general\" → Free Agent + general completion + multi-language tools (general development)
+ *   "general" → Free Agent + general completion + multi-language tools (general development)
  *
  * The mode affects:
  *   - Which tools are available
@@ -34,13 +34,7 @@ export type ModeConfig = {
   override?: AgentMode;
 };
 
-const HEX4_PROJECT_HINTS = [
-  "HEX4-cipher",
-  "HEX4-natural-language-model",
-  "hex4",
-  "ternary",
-  "trit",
-];
+const HEX4_PROJECT_HINTS = ["HEX4密码", "HEX4-新版自然语言模型", "hex4", "ternary", "trit"];
 
 /**
  * Detect whether a project is HEX4-based by scanning directory/file names.
@@ -52,17 +46,11 @@ export function detectProjectMode(projectRoot: string): AgentMode {
   }
   // Check for common HEX4 file indicators
   try {
-    const entries = require("fs").readdirSync(projectRoot, {
-      withFileTypes: true,
-    } as any) as any[];
+    const entries = require("fs").readdirSync(projectRoot, { withFileTypes: true } as any) as any[];
     for (const entry of entries) {
       if (!entry.isDirectory && !entry.isFile) continue;
       const name = (entry.name as string).toLowerCase();
-      if (
-        name.startsWith("hex4") ||
-        name.includes("hex4code-pipeline") ||
-        name.includes("dual-trit")
-      ) {
+      if (name.startsWith("hex4") || name.includes("hex4code-pipeline") || name.includes("dual-trit")) {
         return "hex4";
       }
     }
@@ -75,10 +63,7 @@ export function detectProjectMode(projectRoot: string): AgentMode {
 /**
  * Get the effective agent mode considering detection + user override.
  */
-export function getEffectiveMode(
-  config: ModeConfig,
-  projectRoot: string,
-): AgentMode {
+export function getEffectiveMode(config: ModeConfig, projectRoot: string): AgentMode {
   if (config.override) return config.override;
   if (config.autoDetect) return detectProjectMode(projectRoot);
   return config.mode;

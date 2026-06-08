@@ -24,6 +24,7 @@ export {
   renderBufferWithCursor,
   buildInitPromptSubmission,
   getThinkingOptionIndex,
+  getAvailableModelIds,
   MODEL_COMMAND_MODELS,
   MODEL_COMMAND_THINKING_OPTIONS,
   useTerminalInput,

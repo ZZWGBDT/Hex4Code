@@ -49,7 +49,7 @@
       <div class="model-dropdown" id="modelDropdown"></div>
     </div>
 
-    <!-- 聊天视图 -->
+    <!-- Chat View -->
     <div class="chat-container" id="chatContainer">
       <div class="messages" id="messages"></div>
       <div class="loading" id="loading">
@@ -92,6 +92,44 @@
     </div>
   </div>
 
+  <div class="custom-provider-modal" id="customProviderModal" aria-hidden="true">
+    <div class="custom-provider-panel" role="dialog" aria-modal="true" aria-labelledby="customProviderTitle">
+      <div class="custom-provider-header">
+        <div>
+          <div class="custom-provider-title" id="customProviderTitle">Custom model</div>
+          <div class="custom-provider-subtitle">OpenAI-compatible endpoint</div>
+        </div>
+        <button class="custom-provider-close" id="customProviderClose" title="Close">×</button>
+      </div>
+      <label class="custom-provider-field">
+        <span>Endpoint name</span>
+        <input id="customProviderEndpointName" type="text" placeholder="MiniMax / BigModel / Local" />
+      </label>
+      <label class="custom-provider-field">
+        <span>Base URL</span>
+        <input id="customProviderBaseURL" type="text" placeholder="https://api.example.com/v1" />
+      </label>
+      <label class="custom-provider-field">
+        <span>API Key</span>
+        <input id="customProviderApiKey" type="password" placeholder="sk-..." />
+      </label>
+      <div class="custom-provider-actions">
+        <button id="customProviderFetch" type="button">Fetch models</button>
+        <span class="custom-provider-status" id="customProviderStatus"></span>
+      </div>
+      <label class="custom-provider-field">
+        <span>Model</span>
+        <select id="customProviderModel">
+          <option value="">Fetch models first</option>
+        </select>
+      </label>
+      <div class="custom-provider-footer">
+        <button id="customProviderCancel" type="button">Cancel</button>
+        <button id="customProviderSave" type="button" class="primary">Save</button>
+      </div>
+    </div>
+  </div>
+
 <script nonce="{{nonce}}" src="{{attachmentsJsUri}}"></script>
 <script nonce="{{nonce}}">
   const vscode = acquireVsCodeApi();
@@ -117,6 +155,16 @@
   const modelProviderDot = document.getElementById("modelProviderDot");
   const modelDropdown = document.getElementById("modelDropdown");
   const modelConfigBtn = document.getElementById("modelConfigBtn");
+  const customProviderModal = document.getElementById("customProviderModal");
+  const customProviderClose = document.getElementById("customProviderClose");
+  const customProviderCancel = document.getElementById("customProviderCancel");
+  const customProviderFetch = document.getElementById("customProviderFetch");
+  const customProviderSave = document.getElementById("customProviderSave");
+  const customProviderEndpointName = document.getElementById("customProviderEndpointName");
+  const customProviderBaseURL = document.getElementById("customProviderBaseURL");
+  const customProviderApiKey = document.getElementById("customProviderApiKey");
+  const customProviderModel = document.getElementById("customProviderModel");
+  const customProviderStatus = document.getElementById("customProviderStatus");
   const sendIcon = document.getElementById("sendIcon");
   const stopIcon = document.getElementById("stopIcon");
   const skillsButton = document.getElementById("skillsButton");
@@ -161,11 +209,11 @@
   let modelSearchQuery = "";
   let modelOnlyConfigured = true;
   let lastMessageRole = null;
-  let currentThinkingBubble = null; // 记录当前展开的思考气泡
-  let availableSkills = []; // 可用的技能列表
-  let selectedSkills = []; // 已选择的技能
-  let currentRunningProcesses = null; // 当前正在运行的进程: Record<string, { startTime: string; command: string }> | null
-  let loadingUpdateTimer = null; // 定时更新loading文本的计时器
+  let currentThinkingBubble = null; // Track the currently expanded thinking bubble
+  let availableSkills = []; // Available skills list
+  let selectedSkills = []; // Selected skills
+  let currentRunningProcesses = null; // Current running processes: Record<string, { startTime: string; command: string }> | null
+  let loadingUpdateTimer = null; // Timer for updating loading text periodically
   let currentLlmStreamProgress = null;
   let currentTokenTelemetry = null;
 
@@ -355,7 +403,7 @@
   function showSkillsPopup() {
     if (skillsPopup) {
       skillsPopup.classList.add("show");
-      // 渲染技能列表
+      // Render skills list
       renderSkillsList();
     }
   }
@@ -382,7 +430,7 @@
       if (isSelected) {
         item.classList.add("selected");
       }
-      item.title = skill.path; // 鼠标悬停显示完整路径
+      item.title = skill.path; // Show full path on hover
       item.innerHTML = `
         <span class="skills-popup-item-name" title="${escapeHtml(skill.name)}">${escapeHtml(skill.name)}</span>
         <span class="skills-popup-item-path" title="${escapeHtml(skill.path)}">${escapeHtml(skill.path)}</span>
@@ -414,7 +462,7 @@
 
   function renderSkillsTags() {
     if (!skillsTags) return;
-    // 使用 inner 容器包裹 tags，实现省略号效果
+    // Use inner container to wrap tags, enabling ellipsis overflow effect
     let inner = skillsTags.querySelector(".skills-tags-inner");
     if (!inner) {
       inner = document.createElement("div");
@@ -448,7 +496,7 @@
     }
   }
 
-  // 点击技能按钮
+  // Click skills button
   skillsButton?.addEventListener("click", (e) => {
     e.stopPropagation();
     if (skillsPopup && skillsPopup.classList.contains("show")) {
@@ -458,7 +506,7 @@
     }
   });
 
-  // 点击其他地方关闭技能弹窗
+  // Click elsewhere to close the skills popup
   document.addEventListener("click", (event) => {
     if (skillsPopup && skillsButton && !skillsPopup.contains(event.target) && !skillsButton.contains(event.target)) {
       hideSkillsPopup();
@@ -1244,6 +1292,61 @@
     return `Missing ${model.apiKeyEnv || "key"}`;
   }
 
+  function openCustomProviderModal() {
+    closeModelDropdown();
+    customProviderStatus.textContent = "";
+    if (!customProviderBaseURL.value) {
+      customProviderBaseURL.value = modelState?.baseURL && modelState?.providerId === "custom"
+        ? modelState.baseURL
+        : "http://localhost:11434/v1";
+    }
+    if (!customProviderEndpointName.value) {
+      customProviderEndpointName.value = inferCustomEndpointName(customProviderBaseURL.value);
+    }
+    customProviderModal?.classList.add("show");
+    customProviderModal?.setAttribute("aria-hidden", "false");
+    setTimeout(() => customProviderBaseURL?.focus(), 0);
+  }
+
+  function closeCustomProviderModal() {
+    customProviderModal?.classList.remove("show");
+    customProviderModal?.setAttribute("aria-hidden", "true");
+  }
+
+  function setCustomProviderStatus(text, isError = false) {
+    customProviderStatus.textContent = text || "";
+    customProviderStatus.style.color = isError ? "var(--vscode-errorForeground)" : "var(--vscode-descriptionForeground)";
+  }
+
+  function renderCustomProviderModels(models) {
+    customProviderModel.innerHTML = "";
+    if (!Array.isArray(models) || models.length === 0) {
+      const option = document.createElement("option");
+      option.value = "";
+      option.textContent = "No models found";
+      customProviderModel.appendChild(option);
+      return;
+    }
+    models.forEach((modelId) => {
+      const option = document.createElement("option");
+      option.value = modelId;
+      option.textContent = modelId;
+      customProviderModel.appendChild(option);
+    });
+  }
+
+  function inferCustomEndpointName(baseURL) {
+    try {
+      const host = new URL(baseURL).hostname.toLowerCase();
+      if (host.includes("minimaxi.com")) return "MiniMax";
+      if (host.includes("bigmodel.cn")) return "BigModel";
+      if (host.includes("localhost") || host.includes("127.0.0.1")) return "Local";
+      return host.replace(/^api\./, "");
+    } catch {
+      return "Custom";
+    }
+  }
+
   function renderModelDropdown() {
     if (!modelDropdown || !modelState) {
       return;
@@ -1382,12 +1485,21 @@
     const footer = document.createElement("button");
     footer.className = "model-dropdown-footer";
     footer.type = "button";
-    footer.textContent = "Configure providers...";
+    footer.textContent = "Custom model...";
     footer.addEventListener("click", () => {
+      openCustomProviderModal();
+    });
+    modelDropdown.appendChild(footer);
+
+    const providerFooter = document.createElement("button");
+    providerFooter.className = "model-dropdown-footer";
+    providerFooter.type = "button";
+    providerFooter.textContent = "Configure providers...";
+    providerFooter.addEventListener("click", () => {
       closeModelDropdown();
       vscode.postMessage({ type: "openProviderSettings" });
     });
-    modelDropdown.appendChild(footer);
+    modelDropdown.appendChild(providerFooter);
   }
 
   function updateModelToolbar(state) {
@@ -1559,6 +1671,49 @@
           <div class="session-dropdown-summary">${highlightedSummary}</div>
           <div class="session-dropdown-time">${formatSessionTime(session.updateTime)}</div>
         `;
+
+        // ── Action buttons (only show on hover) ──────────
+        const actions = document.createElement("div");
+        actions.className = "session-dropdown-actions";
+
+        const exportBtn = document.createElement("button");
+        exportBtn.className = "session-action-btn";
+        exportBtn.title = "Export";
+        exportBtn.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>';
+        exportBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          vscode.postMessage({ type: "exportSession", sessionId: session.id });
+        });
+
+        const renameBtn = document.createElement("button");
+        renameBtn.className = "session-action-btn";
+        renameBtn.title = "Rename";
+        renameBtn.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>';
+        renameBtn.addEventListener("click", async (e) => {
+          e.stopPropagation();
+          const newName = await showPromptModal("Rename session:", summary);
+          if (newName && newName.trim()) {
+            vscode.postMessage({ type: "renameSession", sessionId: session.id, newName: newName.trim() });
+          }
+        });
+
+        const deleteBtn = document.createElement("button");
+        deleteBtn.className = "session-action-btn session-action-delete";
+        deleteBtn.title = "Delete";
+        deleteBtn.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>';
+        deleteBtn.addEventListener("click", async (e) => {
+          e.stopPropagation();
+          const confirmed = await showConfirmModal(`Delete "${summary}"?`);
+          if (confirmed) {
+            vscode.postMessage({ type: "deleteSession", sessionId: session.id });
+          }
+        });
+
+        actions.appendChild(exportBtn);
+        actions.appendChild(renameBtn);
+        actions.appendChild(deleteBtn);
+        item.appendChild(actions);
+
         item.addEventListener("click", () => {
           sessionDropdown.classList.remove("show");
           sessionSelector.classList.remove("open");
@@ -1746,8 +1901,44 @@
 
   modelConfigBtn?.addEventListener("click", (event) => {
     event.stopPropagation();
-    closeModelDropdown();
     vscode.postMessage({ type: "openProviderSettings" });
+  });
+
+  customProviderClose?.addEventListener("click", closeCustomProviderModal);
+  customProviderCancel?.addEventListener("click", closeCustomProviderModal);
+  customProviderModal?.addEventListener("click", (event) => {
+    if (event.target === customProviderModal) {
+      closeCustomProviderModal();
+    }
+  });
+  customProviderFetch?.addEventListener("click", () => {
+    const baseURL = customProviderBaseURL.value.trim();
+    const apiKey = customProviderApiKey.value.trim();
+    if (!customProviderEndpointName.value.trim()) {
+      customProviderEndpointName.value = inferCustomEndpointName(baseURL);
+    }
+    renderCustomProviderModels([]);
+    setCustomProviderStatus("Fetching models...");
+    vscode.postMessage({ type: "fetchCustomProviderModels", baseURL, apiKey });
+  });
+  customProviderSave?.addEventListener("click", () => {
+    const baseURL = customProviderBaseURL.value.trim();
+    const apiKey = customProviderApiKey.value.trim();
+    const endpointName = customProviderEndpointName.value.trim();
+    const modelId = customProviderModel.value.trim();
+    if (!baseURL || !apiKey || !modelId) {
+      setCustomProviderStatus("Base URL, API key, and model are required.", true);
+      return;
+    }
+    setCustomProviderStatus("Saving...");
+    vscode.postMessage({
+      type: "saveCustomProvider",
+      baseURL,
+      apiKey,
+      endpointName,
+      modelId,
+      compatibility: customProviderModel.dataset.compatibility || "",
+    });
   });
 
   newSessionBtn.addEventListener("click", () => {
@@ -2063,6 +2254,26 @@
       updateSkillsButtonTooltip();
     } else if (message.type === "settingsState") {
       updateModelToolbar(message.state);
+    } else if (message.type === "customProviderModels") {
+      if (message.ok) {
+        renderCustomProviderModels(message.models || []);
+        customProviderModel.dataset.compatibility = message.compatibility || "";
+        setCustomProviderStatus(`${(message.models || []).length} models found.`);
+      } else {
+        renderCustomProviderModels([]);
+        setCustomProviderStatus(message.error || "Failed to fetch models.", true);
+      }
+    } else if (message.type === "customProviderSaved") {
+      if (message.ok) {
+        setCustomProviderStatus(`Saved ${message.modelId || "custom model"}.`);
+        closeCustomProviderModal();
+      } else {
+        setCustomProviderStatus(message.error || "Failed to save.", true);
+      }
+    } else if (message.type === "updateSessions") {
+      if (message.sessions && Array.isArray(message.sessions)) {
+        updateSessionDropdown(message.sessions);
+      }
     }
   });
 
@@ -2081,6 +2292,56 @@
   // 请求可用技能列表
   vscode.postMessage({ type: "requestSkills" });
   vscode.postMessage({ type: "requestSettingsState" });
+
+  // ── Custom modal helpers (window.confirm/prompt are blocked in VS Code webviews) ──
+  function showConfirmModal(message) {
+    return new Promise((resolve) => {
+      const overlay = document.createElement("div");
+      overlay.className = "modal-overlay";
+      overlay.innerHTML = `
+        <div class="modal-box">
+          <div class="modal-message">${escapeHtml(message)}</div>
+          <div class="modal-actions">
+            <button class="modal-btn modal-btn-secondary" id="modalCancel">Cancel</button>
+            <button class="modal-btn modal-btn-danger" id="modalConfirm">Delete</button>
+          </div>
+        </div>`;
+      document.body.appendChild(overlay);
+      overlay.querySelector("#modalCancel").addEventListener("click", () => { overlay.remove(); resolve(false); });
+      overlay.querySelector("#modalConfirm").addEventListener("click", () => { overlay.remove(); resolve(true); });
+      overlay.addEventListener("click", (e) => { if (e.target === overlay) { overlay.remove(); resolve(false); } });
+    });
+  }
+
+  function showPromptModal(message, defaultValue) {
+    return new Promise((resolve) => {
+      const overlay = document.createElement("div");
+      overlay.className = "modal-overlay";
+      overlay.innerHTML = `
+        <div class="modal-box">
+          <div class="modal-message">${escapeHtml(message)}</div>
+          <input class="modal-input" id="modalInput" type="text" value="${escapeHtml(defaultValue || '')}" autofocus />
+          <div class="modal-actions">
+            <button class="modal-btn modal-btn-secondary" id="modalCancel">Cancel</button>
+            <button class="modal-btn modal-btn-primary" id="modalConfirm">Save</button>
+          </div>
+        </div>`;
+      document.body.appendChild(overlay);
+      const input = overlay.querySelector("#modalInput");
+      input.focus();
+      input.select();
+      overlay.querySelector("#modalCancel").addEventListener("click", () => { overlay.remove(); resolve(null); });
+      overlay.querySelector("#modalConfirm").addEventListener("click", () => { overlay.remove(); resolve(input.value); });
+      input.addEventListener("keydown", (e) => { if (e.key === "Enter") { overlay.remove(); resolve(input.value); } else if (e.key === "Escape") { overlay.remove(); resolve(null); } });
+      overlay.addEventListener("click", (e) => { if (e.target === overlay) { overlay.remove(); resolve(null); } });
+    });
+  }
+
+  function escapeHtml(str) {
+    const div = document.createElement("div");
+    div.textContent = str;
+    return div.innerHTML;
+  }
 </script>
 </body>
 </html>

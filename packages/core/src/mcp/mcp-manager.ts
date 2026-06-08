@@ -65,12 +65,7 @@ export class McpManager {
       if (this.disposed) break;
       let client: McpClient | null = null;
       try {
-        client = new McpClient(
-          name,
-          config.command,
-          config.args ?? [],
-          config.env,
-        );
+        client = new McpClient(name, config.command, config.args ?? [], config.env);
         await client.connect(MCP_STARTUP_TIMEOUT_MS);
         if (this.disposed) {
           client.disconnect();
@@ -103,9 +98,7 @@ export class McpManager {
         if (this.disposed) break;
         client?.disconnect();
         const message = err instanceof Error ? err.message : String(err);
-        process.stderr.write(
-          `[hex4code] MCP server "${name}" failed to initialize: ${message}\n`,
-        );
+        process.stderr.write(`[hex4code] MCP server "${name}" failed to initialize: ${message}\n`);
         this.setStatus({
           name,
           status: "failed",
@@ -152,8 +145,7 @@ export class McpManager {
       type: "function" as const,
       function: {
         name: t.namespacedName,
-        description:
-          t.definition.description ?? `${t.serverName}: ${t.originalName}`,
+        description: t.definition.description ?? `${t.serverName}: ${t.originalName}`,
         parameters: {
           type: "object" as const,
           properties: t.definition.inputSchema.properties,

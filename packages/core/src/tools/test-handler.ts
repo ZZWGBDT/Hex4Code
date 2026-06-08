@@ -26,10 +26,8 @@ type TestFailure = {
 
 // ── Framework patterns ──────────────────────────────────────────────────
 // Custom test framework: T(name), OK(), NG(msg)
-const T_PASS_RE =
-  /^T\s*\(\s*["']([^"']+)["']\s*\)\s*[=:]\s*(PASS|OK|passed|1|true)/im;
-const T_FAIL_RE =
-  /^T\s*\(\s*["']([^"']+)["']\s*\)\s*[=:]\s*(FAIL|NG|failed|0|false)/im;
+const T_PASS_RE = /^T\s*\(\s*["']([^"']+)["']\s*\)\s*[=:]\s*(PASS|OK|passed|1|true)/im;
+const T_FAIL_RE = /^T\s*\(\s*["']([^"']+)["']\s*\)\s*[=:]\s*(FAIL|NG|failed|0|false)/im;
 const NG_RE = /NG\s*[:(]\s*(.+)$/im;
 // Common PASS/FAIL markers
 const PASS_RE = /^(?:PASS|\[\s*PASS\s*\]|\u2713)\s*:?\s*(.+)$/im;
@@ -42,8 +40,7 @@ const GTEST_PASS_RE = /\[\s*PASSED\s*\]\s+(\d+)\s+test/im;
 const GTEST_FAIL_RE = /\[\s*FAILED\s*\]\s+(\d+)\s+test/im;
 const GTEST_CASE_RE = /\[\s*(PASSED|FAILED)\s*\].*$/im;
 // Catch2
-const CATCH2_SUMMARY_RE =
-  /test\s+cases?:\s*(\d+)\s*\|\s*(\d+)\s+passed\s*\|\s*(\d+)\s+failed/im;
+const CATCH2_SUMMARY_RE = /test\s+cases?:\s*(\d+)\s*\|\s*(\d+)\s+passed\s*\|\s*(\d+)\s+failed/im;
 const CATCH2_PASS_RE = /^(PASSED|FAILED):\s*(.+)$/im;
 // CTest
 const CTEST_SUMMARY_RE = /(\d+)%\s*tests\s+passed,\s*(\d+)\s+tests\s+failed/im;
@@ -58,8 +55,7 @@ export async function handleTestTool(
   const project = typeof args.project === "string" ? args.project.trim() : "";
   const binary = typeof args.binary === "string" ? args.binary.trim() : "";
   const filter = typeof args.filter === "string" ? args.filter.trim() : "";
-  const timeout =
-    typeof args.timeout === "number" ? Math.max(5, args.timeout) : 60;
+  const timeout = typeof args.timeout === "number" ? Math.max(5, args.timeout) : 60;
 
   // Resolve project directory
   let projectDir: string;
@@ -82,10 +78,7 @@ export async function handleTestTool(
   // Resolve binary path
   let binaryPath = binary;
   if (!path.isAbsolute(binaryPath)) {
-    binaryPath = path.join(
-      projectDir,
-      binaryPath || findTestBinary(projectDir),
-    );
+    binaryPath = path.join(projectDir, binaryPath || findTestBinary(projectDir));
   }
 
   if (!fs.existsSync(binaryPath)) {
@@ -106,12 +99,8 @@ export async function handleTestTool(
   try {
     const result = await executeTest(binaryPath, filter, projectDir, timeout);
     const durationMs = Date.now() - startTime;
-    const parsed = parseTestOutput(
-      result.stdout + "\n" + result.stderr,
-      durationMs,
-    );
-    for (const f of parsed.failures)
-      f.diagnosis = diagnoseFailure(f.name, projectDir);
+    const parsed = parseTestOutput(result.stdout + "\n" + result.stderr, durationMs);
+    for (const f of parsed.failures) f.diagnosis = diagnoseFailure(f.name, projectDir);
 
     // ── Confidence: derive certainty from test outcome ───────────────
     // TC_NONE:      all tests pass → fully certain
@@ -124,10 +113,7 @@ export async function handleTestTool(
         : parsed.ok && parsed.failures.length === 0
           ? "TC_CARRY"
           : parsed.failures.some(
-                (f) =>
-                  !f.diagnosis ||
-                  f.diagnosis === "(unavailable)" ||
-                  f.diagnosis === "Test not found",
+                (f) => !f.diagnosis || f.diagnosis === "(unavailable)" || f.diagnosis === "Test not found",
               )
             ? "TC_MIXED"
             : "TC_UNCERTAIN";
@@ -166,14 +152,7 @@ export async function handleTestTool(
 // ── Binary discovery ─────────────────────────────────────────────────
 
 function findTestBinary(dir: string): string {
-  const candidates = [
-    "test_all",
-    "test",
-    "run_tests",
-    "test_runner",
-    "tests",
-    "all_tests",
-  ];
+  const candidates = ["test_all", "test", "run_tests", "test_runner", "tests", "all_tests"];
   for (const name of candidates) {
     const fullPath = path.join(dir, name);
     if (fs.existsSync(fullPath)) {
@@ -267,11 +246,7 @@ function parseTestOutput(raw: string, durationMs: number): TestResult {
       // Look for NG message in remaining lines until next T() or end
       let msg = "";
       for (let j = i + 1; j < lines.length; j += 1) {
-        if (
-          lines[j].trim().match(T_PASS_RE) ||
-          lines[j].trim().match(T_FAIL_RE)
-        )
-          break;
+        if (lines[j].trim().match(T_PASS_RE) || lines[j].trim().match(T_FAIL_RE)) break;
         const ngMatch = lines[j].match(NG_RE);
         if (ngMatch) {
           msg = ngMatch[1].trim();
@@ -316,11 +291,7 @@ function parseTestOutput(raw: string, durationMs: number): TestResult {
     if (gtestPass && gtestPass[1] === "FAILED") {
       total += 1;
       failed += 1;
-      failures.push({
-        name: `GTEST: ${line.substring(0, 60)}`,
-        message: line.substring(0, 100),
-        line: i + 1,
-      });
+      failures.push({ name: `GTEST: ${line.substring(0, 60)}`, message: line.substring(0, 100), line: i + 1 });
       continue;
     }
 
@@ -332,11 +303,7 @@ function parseTestOutput(raw: string, durationMs: number): TestResult {
         passed += 1;
       } else {
         failed += 1;
-        failures.push({
-          name: catch2Match[2].substring(0, 60),
-          message: catch2Match[2],
-          line: i + 1,
-        });
+        failures.push({ name: catch2Match[2].substring(0, 60), message: catch2Match[2], line: i + 1 });
       }
       continue;
     }
@@ -346,11 +313,7 @@ function parseTestOutput(raw: string, durationMs: number): TestResult {
     if (tapNotOk) {
       total += 1;
       failed += 1;
-      failures.push({
-        name: tapNotOk[1].substring(0, 60),
-        message: tapNotOk[1],
-        line: i + 1,
-      });
+      failures.push({ name: tapNotOk[1].substring(0, 60), message: tapNotOk[1], line: i + 1 });
       continue;
     }
     const tapOk = line.match(TAP_OK_RE);
@@ -423,19 +386,14 @@ function diagnoseFailure(name: string, projectDir: string): string {
     let testFile = "";
     for (const f of files) {
       const content = fs.readFileSync(f, "utf8");
-      const escaped = name
-        .replace(/["']/g, "")
-        .replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const escaped = name.replace(/["']/g, "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       const re = new RegExp("T\\s*\\(\\s*[\"']" + escaped + "[\"']\\s*\\)");
       const tMatch = content.match(re);
       if (tMatch) {
         testFile = f;
         const lines = content.split("\n");
-        const lineIdx =
-          content.substring(0, tMatch.index).split("\n").length - 1;
-        testCode = lines
-          .slice(Math.max(0, lineIdx - 1), Math.min(lines.length, lineIdx + 6))
-          .join("\n");
+        const lineIdx = content.substring(0, tMatch.index).split("\n").length - 1;
+        testCode = lines.slice(Math.max(0, lineIdx - 1), Math.min(lines.length, lineIdx + 6)).join("\n");
         break;
       }
     }
@@ -457,14 +415,9 @@ function findTestFiles(dir: string): string[] {
     if (!results) results = [];
     for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
       const f = path.join(dir, e.name);
-      if (
-        e.isFile() &&
-        (e.name.startsWith("test_") || e.name.includes("_test")) &&
-        /\.(c|cpp)$/.test(e.name)
-      )
+      if (e.isFile() && (e.name.startsWith("test_") || e.name.includes("_test")) && /\.(c|cpp)$/.test(e.name))
         results!.push(f);
-      else if (e.isDirectory() && !e.name.startsWith("."))
-        results.push(...findTestFiles(f));
+      else if (e.isDirectory() && !e.name.startsWith(".")) results.push(...findTestFiles(f));
     }
   } catch {}
   return results;
@@ -486,10 +439,7 @@ function findFuncFile(name: string, dir: string): string | null {
 }
 
 function buildTestOutput(result: TestResult): string {
-  const lines: string[] = [
-    `Results: ${result.summary}`,
-    `Duration: ${result.durationMs}ms`,
-  ];
+  const lines: string[] = [`Results: ${result.summary}`, `Duration: ${result.durationMs}ms`];
 
   if (result.failures.length > 0) {
     lines.push("");
@@ -498,8 +448,7 @@ function buildTestOutput(result: TestResult): string {
       const loc = f.line ? ` (line ${f.line})` : "";
       lines.push(`  ✗ ${f.name}${loc}`);
       if (f.message) lines.push("    " + f.message);
-      if (f.diagnosis)
-        lines.push("    Dx: " + f.diagnosis.split("\n")[0].substring(0, 200));
+      if (f.diagnosis) lines.push("    Dx: " + f.diagnosis.split("\n")[0].substring(0, 200));
     }
   }
 

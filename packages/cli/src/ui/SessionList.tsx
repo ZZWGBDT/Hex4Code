@@ -1,20 +1,36 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import { Box, Text, useInput, useWindowSize } from "ink";
 import type { SessionEntry } from "@hex4code/core/session";
 import { CLI_THEME } from "./theme";
+
+type ActionMode = "navigate" | "confirmDelete" | "renaming";
 
 type Props = {
   sessions: SessionEntry[];
   onSelect: (sessionId: string) => void;
   onCancel: () => void;
+  onDelete: (sessionId: string) => void;
+  onExport: (sessionId: string) => void;
+  onRename: (sessionId: string, newName: string) => void;
 };
+
+const STATUS_MESSAGE_DURATION_MS = 2000;
 
 export function SessionList({
   sessions,
   onSelect,
   onCancel,
+  onDelete,
+  onExport,
+  onRename,
 }: Props): React.ReactElement {
   const [index, setIndex] = useState(0);
+  const [actionMode, setActionMode] = useState<ActionMode>("navigate");
+  const [confirmTargetId, setConfirmTargetId] = useState<string | null>(null);
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const statusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { columns, rows } = useWindowSize();
 
   // Dynamically calculate the number of visible sessions based on terminal height
@@ -44,7 +60,73 @@ export function SessionList({
     return sessions.slice(scrollOffset, scrollOffset + maxVisibleSessions);
   }, [sessions, scrollOffset, maxVisibleSessions]);
 
+  // Auto-dismiss status messages after the configured duration
+  useEffect(() => {
+    if (statusMessage) {
+      if (statusTimerRef.current) clearTimeout(statusTimerRef.current);
+      statusTimerRef.current = setTimeout(
+        () => setStatusMessage(null),
+        STATUS_MESSAGE_DURATION_MS,
+      );
+      return () => {
+        if (statusTimerRef.current) clearTimeout(statusTimerRef.current);
+      };
+    }
+  }, [statusMessage]);
+
   useInput((input, key) => {
+    // ── Renaming mode ───────────────────────────────────────────
+    if (actionMode === "renaming") {
+      if (key.escape) {
+        setActionMode("navigate");
+        setRenamingId(null);
+        setRenameValue("");
+        return;
+      }
+      if (key.return) {
+        const targetId = renamingId;
+        const newName = renameValue.trim();
+        if (targetId && newName) {
+          onRename(targetId, newName);
+          setStatusMessage(`✅ Renamed to "${newName.slice(0, 40)}"`);
+        }
+        setActionMode("navigate");
+        setRenamingId(null);
+        setRenameValue("");
+        return;
+      }
+      if (key.backspace || key.delete) {
+        setRenameValue((v) => v.slice(0, -1));
+        return;
+      }
+      // Append printable characters (filter out control inputs)
+      if (input && input.length > 0 && !key.ctrl && !key.meta) {
+        setRenameValue((v) => v + input);
+      }
+      return;
+    }
+
+    // ── Confirm-delete mode ─────────────────────────────────────
+    if (actionMode === "confirmDelete") {
+      if (key.escape || input === "n" || input === "N") {
+        setActionMode("navigate");
+        setConfirmTargetId(null);
+        return;
+      }
+      if (input === "y" || input === "Y") {
+        const targetId = confirmTargetId;
+        if (targetId) {
+          onDelete(targetId);
+          setStatusMessage("✅ Deleted");
+        }
+        setActionMode("navigate");
+        setConfirmTargetId(null);
+        return;
+      }
+      return; // Ignore all other keys in confirm mode
+    }
+
+    // ── Normal navigation mode ──────────────────────────────────
     if (key.escape || (key.ctrl && (input === "c" || input === "C"))) {
       onCancel();
       return;
@@ -81,6 +163,32 @@ export function SessionList({
       if (session) {
         onSelect(session.id);
       }
+      return;
+    }
+    if (input === "d" || input === "D") {
+      const session = sessions[safeIndex];
+      if (session) {
+        setActionMode("confirmDelete");
+        setConfirmTargetId(session.id);
+      }
+      return;
+    }
+    if (input === "e" || input === "E") {
+      const session = sessions[safeIndex];
+      if (session) {
+        onExport(session.id);
+        setStatusMessage("✅ Exported to project root");
+      }
+      return;
+    }
+    if (input === "r" || input === "R") {
+      const session = sessions[safeIndex];
+      if (session) {
+        setActionMode("renaming");
+        setRenamingId(session.id);
+        setRenameValue(session.summary || "");
+      }
+      return;
     }
   });
 
@@ -134,27 +242,54 @@ export function SessionList({
         >
           {visibleSessions.map((session, i) => {
             const actualIndex = scrollOffset + i;
+            const isSelected = actualIndex === safeIndex;
+            const isConfirmTarget =
+              actionMode === "confirmDelete" && session.id === confirmTargetId;
+            const isRenaming =
+              actionMode === "renaming" && session.id === renamingId;
+
             return (
               <Box key={session.id} height={2} marginBottom={1}>
                 <Box>
-                  <Text color={CLI_THEME.accent}>
-                    {actualIndex === safeIndex ? "› " : "  "}
+                  <Text
+                    color={
+                      isConfirmTarget
+                        ? "red"
+                        : isRenaming
+                          ? CLI_THEME.accent
+                          : CLI_THEME.accent
+                    }
+                  >
+                    {isSelected ? "› " : "  "}
                   </Text>
                 </Box>
                 <Box flexDirection="column" flexGrow={1}>
-                  <Box width={"100%"}>
-                    <Text
-                      {...(actualIndex === safeIndex ? { bold: true } : {})}
-                      color={
-                        actualIndex === safeIndex
-                          ? CLI_THEME.accentStrong
-                          : undefined
-                      }
-                    >
-                      {formatSessionTitle(session.summary || "Untitled")}
-                    </Text>
-                    <Text dimColor> ({session.status})</Text>
-                  </Box>
+                  {isConfirmTarget ? (
+                    <Box width={"100%"}>
+                      <Text bold color="red">
+                        Delete "
+                        {formatSessionTitle(session.summary || "Untitled", 50)}
+                        "? [y/N]
+                      </Text>
+                    </Box>
+                  ) : isRenaming ? (
+                    <Box width={"100%"}>
+                      <Text bold color={CLI_THEME.accent}>
+                        Rename: ▍{renameValue}
+                      </Text>
+                      <Text color={CLI_THEME.accent}>_</Text>
+                    </Box>
+                  ) : (
+                    <Box width={"100%"}>
+                      <Text
+                        {...(isSelected ? { bold: true } : {})}
+                        color={isSelected ? CLI_THEME.accentStrong : undefined}
+                      >
+                        {formatSessionTitle(session.summary || "Untitled")}
+                      </Text>
+                      <Text dimColor> ({session.status})</Text>
+                    </Box>
+                  )}
                   <Box width="100%">
                     <Text dimColor>{formatTimestamp(session.updateTime)} </Text>
                   </Box>
@@ -178,10 +313,21 @@ export function SessionList({
           ) : null}
         </Box>
         {/* Footer */}
-        <Box>
-          <Text dimColor>
-            ↑/↓ navigate · PgUp/PgDn page · Enter select · Esc cancel
-          </Text>
+        <Box flexDirection="column">
+          {statusMessage ? (
+            <Box paddingX={1}>
+              <Text color="green">{statusMessage}</Text>
+            </Box>
+          ) : null}
+          <Box>
+            <Text dimColor>
+              {actionMode === "confirmDelete"
+                ? "y confirm · n/esc cancel"
+                : actionMode === "renaming"
+                  ? "Type to edit · Enter save · Esc cancel"
+                  : "↑/↓ navigate · PgUp/PgDn page · Enter select · D delete · E export · R rename · Esc cancel"}
+            </Text>
+          </Box>
         </Box>
       </Box>
     </Box>

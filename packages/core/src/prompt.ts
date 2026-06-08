@@ -245,19 +245,16 @@ Here's an example of how your output should be structured:
 
 </summary>`;
 
-const SYSTEM_PROMPT_BASE = `你是名叫Hex4Code的交互式CLI工具，帮助用户完成软件工程任务。Use the instructions below and the tools available to you to assist the user.
+const SYSTEM_PROMPT_BASE = `You are Hex4Code, an interactive CLI tool designed to assist users with software engineering tasks. Use the instructions below and the tools available to you to assist the user.
 
-重要：严禁编造任何非编程相关的 URL。对于编程链接，仅限使用：1) 用户提供的上下文；2) 你确定的官方文档主域名。在输出前，必须自查该链接是否存在于你的上下文记忆中；若不存在，请明确说明无法提供。`;
+Important: Do not fabricate any non-programming-related URLs. For programming links, only use: 1) URLs provided by the user; 2) official documentation domains you have verified. Before outputting, verify that the link exists in your context memory; if not, state clearly that you cannot provide it.`;
 
 type PromptToolOptions = {
   model?: string;
   webSearchEnabled?: boolean;
 };
 
-function readToolDocs(
-  extensionRoot: string,
-  options: PromptToolOptions = {},
-): string {
+function readToolDocs(extensionRoot: string, options: PromptToolOptions = {}): string {
   const toolsDir = path.join(extensionRoot, "templates", "tools");
   if (!fs.existsSync(toolsDir)) {
     return "";
@@ -272,9 +269,7 @@ function readToolDocs(
       try {
         const template = fs.readFileSync(fullPath, "utf8");
         const content = entry.endsWith(".ejs")
-          ? ejs.render(template, {
-              supportsMultimodal: supportsMultimodal(options.model ?? ""),
-            })
+          ? ejs.render(template, { supportsMultimodal: supportsMultimodal(options.model ?? "") })
           : template;
         return content.trim();
       } catch {
@@ -287,17 +282,12 @@ function readToolDocs(
 }
 
 function getCurrentDatePrompt(date = new Date()): string {
-  return `今天是${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日。随着对话的进行，时间在流逝。`;
+  return `Today is ${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}. The conversation is progressing, and time is moving forward.`;
 }
 
-export function getSystemPrompt(
-  projectRoot: string,
-  options: PromptToolOptions = {},
-): string {
+export function getSystemPrompt(projectRoot: string, options: PromptToolOptions = {}): string {
   const toolDocs = readToolDocs(getExtensionRoot(), options);
-  const basePrompt = toolDocs
-    ? `${SYSTEM_PROMPT_BASE}\n\n# Available Tools\n\n${toolDocs}`
-    : SYSTEM_PROMPT_BASE;
+  const basePrompt = toolDocs ? `${SYSTEM_PROMPT_BASE}\n\n# Available Tools\n\n${toolDocs}` : SYSTEM_PROMPT_BASE;
   return `${basePrompt}\n\n${getCurrentDatePrompt()}\n\n${getRuntimeContext(projectRoot)}`;
 }
 
@@ -320,8 +310,7 @@ export function getCompactPrompt(sessionMessages: SessionMessage[]): string {
 function getRuntimeContext(projectRoot: string): string {
   const uname = getUnameInfo();
   const shellPath = getShellPathInfo();
-  const shellModeOpts =
-    process.platform === "win32" ? { "shell mode": "git-bash" } : {};
+  const shellModeOpts = process.platform === "win32" ? { "shell mode": "git-bash" } : {};
   const runtimeVersions = getRuntimeVersionInfo();
   const env = {
     "root path": projectRoot,
@@ -440,10 +429,7 @@ export type ToolDefinition = {
   };
 };
 
-export function getTools(
-  _options: PromptToolOptions = {},
-  externalTools: ToolDefinition[] = [],
-): ToolDefinition[] {
+export function getTools(_options: PromptToolOptions = {}, externalTools: ToolDefinition[] = []): ToolDefinition[] {
   const tools: ToolDefinition[] = [
     {
       type: "function",
@@ -479,8 +465,7 @@ export function getTools(
           properties: {
             questions: {
               type: "array",
-              description:
-                "Questions to present to the user. Usually only one question is needed at a time.",
+              description: "Questions to present to the user. Usually only one question is needed at a time.",
               items: {
                 type: "object",
                 properties: {
@@ -490,13 +475,11 @@ export function getTools(
                   },
                   multiSelect: {
                     type: "boolean",
-                    description:
-                      "Whether the user may choose multiple options.",
+                    description: "Whether the user may choose multiple options.",
                   },
                   options: {
                     type: "array",
-                    description:
-                      "A list of predefined options for the user to choose from.",
+                    description: "A list of predefined options for the user to choose from.",
                     items: {
                       type: "object",
                       properties: {
@@ -527,8 +510,7 @@ export function getTools(
       type: "function",
       function: {
         name: "read",
-        description:
-          "Read files from the filesystem (text, images, PDFs, notebooks).",
+        description: "Read files from the filesystem (text, images, PDFs, notebooks).",
         parameters: {
           type: "object",
           properties: {
@@ -546,8 +528,7 @@ export function getTools(
             },
             pages: {
               type: "string",
-              description:
-                'Page range for PDF files (e.g., "1-5", "3", "10-20"). Only applicable to PDF files.',
+              description: 'Page range for PDF files (e.g., "1-5", "3", "10-20"). Only applicable to PDF files.',
             },
           },
           required: ["file_path"],
@@ -559,8 +540,7 @@ export function getTools(
       type: "function",
       function: {
         name: "write",
-        description:
-          "Create files or overwrite them with a complete string payload. Prefer edit for existing files.",
+        description: "Create files or overwrite them with a complete string payload. Prefer edit for existing files.",
         parameters: {
           type: "object",
           properties: {
@@ -570,8 +550,7 @@ export function getTools(
             },
             content: {
               type: "string",
-              description:
-                "Complete file content as a single string. Serialize JSON documents before writing.",
+              description: "Complete file content as a single string. Serialize JSON documents before writing.",
             },
           },
           required: ["file_path", "content"],
@@ -589,8 +568,7 @@ export function getTools(
           properties: {
             file_path: {
               type: "string",
-              description:
-                "Absolute path to file. Optional when snippet_id is provided.",
+              description: "Absolute path to file. Optional when snippet_id is provided.",
             },
             snippet_id: {
               type: "string",
@@ -599,8 +577,7 @@ export function getTools(
             },
             old_string: {
               type: "string",
-              description:
-                "Exact text to replace inside the file or snippet scope",
+              description: "Exact text to replace inside the file or snippet scope",
             },
             new_string: {
               type: "string",
@@ -608,14 +585,12 @@ export function getTools(
             },
             replace_all: {
               type: "boolean",
-              description:
-                "Replace all occurences of old_string (default false)",
+              description: "Replace all occurences of old_string (default false)",
               default: false,
             },
             expected_occurrences: {
               type: "number",
-              description:
-                "Expected number of matches, especially useful as a safety check with replace_all",
+              description: "Expected number of matches, especially useful as a safety check with replace_all",
             },
           },
           required: ["old_string", "new_string"],
@@ -659,12 +634,11 @@ export function getTools(
           project: {
             type: "string",
             description:
-              "Project subdirectory (relative to project root) or absolute path. If omitted, builds in the project root. For C/C++ projects, use the subdirectory name like 'HEX4密码', 'HEX4-新版自然语言模型', etc.",
+              "Project subdirectory (relative to project root) or absolute path. If omitted, builds in the project root. For C/C++ projects, use the subdirectory name like 'HEX4-cipher', 'HEX4-natural-language-model', etc.",
           },
           target: {
             type: "string",
-            description:
-              "Make target to build (e.g., 'test_all', 'all', 'clean'). Omit for default target.",
+            description: "Make target to build (e.g., 'test_all', 'all', 'clean'). Omit for default target.",
           },
           clean: {
             type: "boolean",
@@ -673,8 +647,7 @@ export function getTools(
           },
           flags: {
             type: "string",
-            description:
-              'Extra flags to pass to make (e.g., "CC=clang", "OPT=-O3"). Passed as-is after the target.',
+            description: 'Extra flags to pass to make (e.g., "CC=clang", "OPT=-O3"). Passed as-is after the target.',
           },
         },
         required: [],
@@ -706,7 +679,7 @@ export function getTools(
           project: {
             type: "string",
             description:
-              "Limit search to a specific project subdirectory (e.g., 'HEX4密码', 'HEX4-新版自然语言模型'). Omit to search the entire project root.",
+              "Limit search to a specific project subdirectory (e.g., 'HEX4-cipher', 'HEX4-natural-language-model'). Omit to search the entire project root.",
           },
           context: {
             type: "number",
@@ -731,7 +704,7 @@ export function getTools(
           project: {
             type: "string",
             description:
-              "Project subdirectory where the test binary lives (e.g., 'HEX4密码', 'HEX4-新版自然语言模型'). Omit to use project root.",
+              "Project subdirectory where the test binary lives (e.g., 'HEX4-cipher', 'HEX4-natural-language-model'). Omit to use project root.",
           },
           binary: {
             type: "string",
@@ -740,8 +713,7 @@ export function getTools(
           },
           filter: {
             type: "string",
-            description:
-              "Test name filter string (passed as first argument to the test binary).",
+            description: "Test name filter string (passed as first argument to the test binary).",
           },
           timeout: {
             type: "number",

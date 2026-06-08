@@ -135,26 +135,26 @@ function getFileIcon(ext: string): string {
   const iconMap: Record<string, string> = {
     ".ts": "$(symbol-parameter)", // TypeScript
     ".tsx": "$(symbol-parameter)",
-    ".js": "$(symbol-ruler)", // JavaScript
+    ".js": "$(symbol-ruler)",       // JavaScript
     ".jsx": "$(symbol-ruler)",
-    ".py": "$(symbol-key)", // Python
-    ".rs": "$(symbol-structure)", // Rust
-    ".go": "$(symbol-enum)", // Go
-    ".c": "$(symbol-misc)", // C
+    ".py": "$(symbol-key)",        // Python
+    ".rs": "$(symbol-structure)",   // Rust
+    ".go": "$(symbol-enum)",       // Go
+    ".c": "$(symbol-misc)",        // C
     ".h": "$(symbol-misc)",
     ".cpp": "$(symbol-misc)",
     ".hpp": "$(symbol-misc)",
     ".json": "$(symbol-property)", // JSON
     ".yaml": "$(symbol-property)",
     ".yml": "$(symbol-property)",
-    ".md": "$(symbol-text)", // Markdown
-    ".html": "$(symbol-event)", // HTML
-    ".css": "$(symbol-color)", // CSS
-    ".sh": "$(terminal)", // Shell
-    ".toml": "$(settings-gear)", // Config
+    ".md": "$(symbol-text)",       // Markdown
+    ".html": "$(symbol-event)",    // HTML
+    ".css": "$(symbol-color)",     // CSS
+    ".sh": "$(terminal)",          // Shell
+    ".toml": "$(settings-gear)",   // Config
     ".gitignore": "$(git-branch)",
-    Dockerfile: "$(container)",
-    Makefile: "$(build)",
+    "Dockerfile": "$(container)",
+    "Makefile": "$(build)",
   };
   return iconMap[ext] || "$(file)";
 }
@@ -172,10 +172,8 @@ function readFileContent(filePath: string): string | null {
     const content = fs.readFileSync(filePath, "utf8");
     const lines = content.split("\n");
     if (lines.length > MAX_PREVIEW_LINES) {
-      return (
-        lines.slice(0, MAX_PREVIEW_LINES).join("\n") +
-        `\n... (${lines.length - MAX_PREVIEW_LINES} more lines)`
-      );
+      return lines.slice(0, MAX_PREVIEW_LINES).join("\n") +
+        `\n... (${lines.length - MAX_PREVIEW_LINES} more lines)`;
     }
     return content;
   } catch {
@@ -192,13 +190,13 @@ function readFileContent(filePath: string): string | null {
 export async function pickFileReference(): Promise<string | null> {
   const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri?.fsPath;
   if (!workspaceRoot) {
-    vscode.window.showInformationMessage("没有打开的工作区，无法引用文件");
+    vscode.window.showInformationMessage("No workspace is open. Cannot reference files.");
     return null;
   }
 
   const index = getFileIndex(workspaceRoot);
   if (index.length === 0) {
-    vscode.window.showInformationMessage("工作区中未找到可引用的文件");
+    vscode.window.showInformationMessage("No referenceable files found in the workspace.");
     return null;
   }
 
@@ -233,9 +231,7 @@ export async function pickFileReference(): Promise<string | null> {
 
       const content = readFileContent(fileEntry.absolutePath);
       if (content === null) {
-        vscode.window.showErrorMessage(
-          `Cannot read file: ${fileEntry.relativePath}`,
-        );
+        vscode.window.showErrorMessage(`Cannot read file: ${fileEntry.relativePath}`);
         resolve(null);
         quickPick.hide();
         quickPick.dispose();
@@ -268,9 +264,7 @@ export async function pickFileReference(): Promise<string | null> {
  * Register the @mention command.
  * Users can trigger it via command palette or the chat will auto-detect @.
  */
-export function registerFileReferenceCommand(
-  context: vscode.ExtensionContext,
-): void {
+export function registerFileReferenceCommand(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
     vscode.commands.registerCommand("hex4code.mentionFile", async () => {
       const reference = await pickFileReference();
@@ -278,7 +272,7 @@ export function registerFileReferenceCommand(
         // Copy to clipboard for the user to paste
         await vscode.env.clipboard.writeText(reference);
         vscode.window.showInformationMessage(
-          "文件引用已复制到剪贴板，粘贴到对话中使用",
+          "File reference copied to clipboard. Paste it into the conversation to use.",
         );
       }
     }),

@@ -21,12 +21,7 @@
  *   → Final TC: merge([U, CARRY]) = UNCERTAIN
  */
 
-import type {
-  ToolCall,
-  ToolExecutionResult,
-  TCType,
-  TCLink,
-} from "../tools/executor";
+import type { ToolCall, ToolExecutionResult, TCType, TCLink } from "../tools/executor";
 import { mergeTC } from "../tools/executor";
 
 // ── Pipeline stage identifiers ────────────────────────────────────
@@ -70,11 +65,7 @@ export function detectPipeline(toolCalls: ToolCall[]): PipelineStage[] | null {
   const names = toolCalls.map((tc) => tc.function.name);
 
   // Priority 1: Full pipeline — build → test → codeIndex
-  if (
-    names.includes("build") &&
-    names.includes("test") &&
-    names.includes("codeIndex")
-  ) {
+  if (names.includes("build") && names.includes("test") && names.includes("codeIndex")) {
     const stages: PipelineStage[] = [];
     for (const name of ["build", "test", "codeIndex"]) {
       const tc = toolCalls.find((t) => t.function.name === name);
@@ -131,9 +122,7 @@ export function buildPipelineSummary(stages: PipelineStage[]): string {
   const toolChain = stages.map((s) => s.toolName).join(" -> ");
   const symbolNames = stages.map((s) => SYMBOL_NAMES[s.symbol]).join(" -> ");
 
-  const tcStates: TCType[] = stages
-    .map((s) => s.result?.tcState)
-    .filter((t): t is TCType => t !== undefined);
+  const tcStates: TCType[] = stages.map((s) => s.result?.tcState).filter((t): t is TCType => t !== undefined);
 
   let summary = `[Pipeline] ${symbolChain} (${toolChain})\n  Stages: ${symbolNames}`;
 

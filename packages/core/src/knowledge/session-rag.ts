@@ -48,10 +48,7 @@ export function tokenize(text: string): Map<string, number> {
 }
 
 /** Compute cosine similarity between two BOW vectors */
-export function cosineSimilarity(
-  a: Map<string, number>,
-  b: Map<string, number>,
-): number {
+export function cosineSimilarity(a: Map<string, number>, b: Map<string, number>): number {
   let dot = 0,
     normA = 0,
     normB = 0;
@@ -94,9 +91,7 @@ export function rebuildKnowledgeBase(): { chunks: number; sessions: number } {
   }
 
   loaded = true;
-  console.log(
-    `[RAG] Loaded ${knowledgeBase.length} chunks from ${sessionCount} sessions`,
-  );
+  console.log(`[RAG] Loaded ${knowledgeBase.length} chunks from ${sessionCount} sessions`);
   return { chunks: knowledgeBase.length, sessions: sessionCount };
 }
 
@@ -113,11 +108,7 @@ function extractQA(filePath: string): KnowledgeChunk[] {
         const msg = JSON.parse(line);
         if (msg.role === "user" && typeof msg.content === "string") {
           lastUser = msg.content.substring(0, 500);
-        } else if (
-          msg.role === "assistant" &&
-          typeof msg.content === "string" &&
-          lastUser
-        ) {
+        } else if (msg.role === "assistant" && typeof msg.content === "string" && lastUser) {
           const id = `chunk-${chunks.length}`;
           chunks.push({
             id,
@@ -140,10 +131,7 @@ function extractQA(filePath: string): KnowledgeChunk[] {
 
 // ── Search ───────────────────────────────────────────────────────────
 
-export function searchKnowledge(
-  query: string,
-  topK: number = 3,
-): Array<{ chunk: KnowledgeChunk; score: number }> {
+export function searchKnowledge(query: string, topK: number = 3): Array<{ chunk: KnowledgeChunk; score: number }> {
   if (!loaded || knowledgeBase.length === 0) {
     // Auto-load on first use
     rebuildKnowledgeBase();
@@ -163,9 +151,7 @@ export function searchKnowledge(
   return results.slice(0, topK);
 }
 
-export function formatKnowledgeResults(
-  results: Array<{ chunk: KnowledgeChunk; score: number }>,
-): string {
+export function formatKnowledgeResults(results: Array<{ chunk: KnowledgeChunk; score: number }>): string {
   if (results.length === 0) return "No relevant knowledge found.";
 
   return results
@@ -225,25 +211,15 @@ export function extractErrorPatterns(): ErrorPattern[] {
             const msg = JSON.parse(line);
 
             // Detect error types
-            if (
-              msg.role === "tool" &&
-              msg.meta?.name === "build" &&
-              msg.content?.includes("error:")
-            ) {
-              const match =
-                msg.content.match(/error:\s*(.+)/) ||
-                msg.content.match(/undefined reference to `(\\w+)`/);
+            if (msg.role === "tool" && msg.meta?.name === "build" && msg.content?.includes("error:")) {
+              const match = msg.content.match(/error:\s*(.+)/) || msg.content.match(/undefined reference to `(\\w+)`/);
               if (match) {
                 errorType = match[1].substring(0, 100);
                 buildOutput = msg.content.substring(0, 500);
                 inError = true;
               }
             }
-            if (
-              msg.role === "tool" &&
-              msg.meta?.name === "test" &&
-              msg.content?.includes("FAIL")
-            ) {
+            if (msg.role === "tool" && msg.meta?.name === "test" && msg.content?.includes("FAIL")) {
               errorType = msg.content.substring(0, 100);
               inError = true;
             }
@@ -251,16 +227,11 @@ export function extractErrorPatterns(): ErrorPattern[] {
             // Track tool calls during error remediation
             if (inError && msg.role === "tool" && msg.meta?.name) {
               const toolName = msg.meta.name;
-              if (
-                ["edit", "write", "bash", "build", "test"].includes(toolName)
-              ) {
+              if (["edit", "write", "bash", "build", "test"].includes(toolName)) {
                 fixSequence.push(toolName);
               }
               // Check if error was resolved
-              if (
-                toolName === "build" &&
-                msg.content?.includes("Build succeeded")
-              ) {
+              if (toolName === "build" && msg.content?.includes("Build succeeded")) {
                 finalStatus = "fixed";
               }
               if (toolName === "test" && msg.content?.includes("/0 failed")) {
@@ -287,11 +258,7 @@ export function extractErrorPatterns(): ErrorPattern[] {
       }
     }
   }
-  console.log(
-    "[Patterns] Extracted " +
-      String(extractedPatterns.length) +
-      " error-fix patterns",
-  );
+  console.log("[Patterns] Extracted " + String(extractedPatterns.length) + " error-fix patterns");
   return extractedPatterns;
 }
 

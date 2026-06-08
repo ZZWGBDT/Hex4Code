@@ -1,13 +1,13 @@
 /// @file semantic-cache.ts
-/// @brief 语义缓存引擎 — 基于 n-gram 相似度的 LLM 响应缓存
+/// @brief Semantic cache engine — n-gram similarity based LLM response cache
 ///
-/// 工作原理：
-///   1. 对每个 query 计算 n-gram 特征向量（字符 3-gram）
-///   2. 新 query 到达时，与缓存条目计算余弦相似度
-///   3. 相似度超过阈值（默认 0.85）且同一模型 → 返回缓存响应
-///   4. 自动 TTL 过期（默认 1 小时）和 LRU 淘汰（默认 200 条）
+/// How it works:
+///   1. Compute n-gram feature vector for each query (character 3-gram)
+///   2. When a new query arrives, calculate cosine similarity with cached entries
+///   3. Similarity exceeds threshold (default 0.85) and same model -> return cached response
+///   4. Automatic TTL expiration (default 1 hour) and LRU eviction (default 200 entries)
 ///
-/// 纯内存实现，无外部依赖。可选的持久化到 JSON 文件。
+/// Pure in-memory implementation, no external dependencies. Optional persistence to JSON file.
 
 import * as fs from "fs";
 import * as path from "path";
@@ -96,10 +96,7 @@ export class SemanticCache {
   }
 
   /** 计算文本的 n-gram 特征向量 */
-  private computeFingerprint(
-    text: string,
-    n: number = 3,
-  ): Record<string, number> {
+  private computeFingerprint(text: string, n: number = 3): Record<string, number> {
     const fingerprint: Record<string, number> = {};
     const normalized = text.toLowerCase().replace(/\s+/g, " ");
     for (let i = 0; i <= normalized.length - n; i++) {
@@ -110,10 +107,7 @@ export class SemanticCache {
   }
 
   /** 计算两个特征向量的余弦相似度 */
-  private cosineSimilarity(
-    a: Record<string, number>,
-    b: Record<string, number>,
-  ): number {
+  private cosineSimilarity(a: Record<string, number>, b: Record<string, number>): number {
     let dotProduct = 0;
     let normA = 0;
     let normB = 0;
@@ -131,10 +125,7 @@ export class SemanticCache {
   }
 
   /** 查找缓存命中 */
-  find(
-    query: string,
-    model: string,
-  ): { hit: true; entry: CacheEntry } | { hit: false } {
+  find(query: string, model: string): { hit: true; entry: CacheEntry } | { hit: false } {
     this.evictExpired();
 
     const queryFingerprint = this.computeFingerprint(query);
@@ -189,13 +180,7 @@ export class SemanticCache {
   }
 
   /** 缓存统计 */
-  stats(): {
-    totalEntries: number;
-    totalModels: string[];
-    hitRate: number;
-    hits: number;
-    misses: number;
-  } {
+  stats(): { totalEntries: number; totalModels: string[]; hitRate: number; hits: number; misses: number } {
     const models = new Set(this.entries.map((e) => e.model));
     return {
       totalEntries: this.entries.length,
@@ -210,10 +195,7 @@ export class SemanticCache {
   private misses = 0;
 
   /** 查找并自动记录命中/未命中 */
-  findWithStats(
-    query: string,
-    model: string,
-  ): { hit: true; entry: CacheEntry } | { hit: false } {
+  findWithStats(query: string, model: string): { hit: true; entry: CacheEntry } | { hit: false } {
     const result = this.find(query, model);
     if (result.hit) this.hits++;
     else this.misses++;
@@ -237,11 +219,7 @@ export class SemanticCache {
         accessCount: e.accessCount,
         lastAccessed: e.lastAccessed,
       }));
-      fs.writeFileSync(
-        this.config.persistPath,
-        JSON.stringify(data, null, 2),
-        "utf8",
-      );
+      fs.writeFileSync(this.config.persistPath, JSON.stringify(data, null, 2), "utf8");
     } catch {
       /* 持久化失败不阻塞主流程 */
     }
@@ -257,10 +235,7 @@ export class SemanticCache {
       this.entries = data
         .filter(
           (e: Record<string, unknown>) =>
-            e &&
-            typeof e.query === "string" &&
-            typeof e.response === "string" &&
-            typeof e.model === "string",
+            e && typeof e.query === "string" && typeof e.response === "string" && typeof e.model === "string",
         )
         .map((e: Record<string, unknown>) => ({
           query: e.query as string,
@@ -289,12 +264,7 @@ export function getGlobalCache(config?: SemanticCacheConfig): SemanticCache {
     const cfg: SemanticCacheConfig = { ...config };
     if (!cfg.persistPath) {
       try {
-        cfg.persistPath = path.join(
-          os.homedir(),
-          ".hex4code",
-          "cache",
-          "semantic-cache.json",
-        );
+        cfg.persistPath = path.join(os.homedir(), ".hex4code", "cache", "semantic-cache.json");
       } catch {
         /* no persistence fallback */
       }

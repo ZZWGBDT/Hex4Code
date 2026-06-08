@@ -1,11 +1,7 @@
 import { randomUUID } from "crypto";
 import { spawn } from "child_process";
 import type OpenAI from "openai";
-import type {
-  CreateOpenAIClient,
-  ToolExecutionContext,
-  ToolExecutionResult,
-} from "./executor";
+import type { CreateOpenAIClient, ToolExecutionContext, ToolExecutionResult } from "./executor";
 
 const MAX_OUTPUT_CHARS = 30000;
 const MAX_CAPTURE_CHARS = 10 * 1024 * 1024;
@@ -49,12 +45,7 @@ export async function handleWebSearchTool(
   const llmContext = context.createOpenAIClient?.();
   const scriptPath = llmContext?.webSearchTool?.trim();
   if (scriptPath) {
-    return executeConfiguredWebSearch(
-      query,
-      scriptPath,
-      context,
-      llmContext?.env ?? {},
-    );
+    return executeConfiguredWebSearch(query, scriptPath, context, llmContext?.env ?? {});
   }
 
   if (!hasUsableClient(llmContext)) {
@@ -69,9 +60,7 @@ export async function handleWebSearchTool(
   return executeDefaultWebSearch(query, llmContext, context);
 }
 
-function hasUsableClient(
-  value: ReturnType<CreateOpenAIClient> | undefined,
-): value is LLMClientContext {
+function hasUsableClient(value: ReturnType<CreateOpenAIClient> | undefined): value is LLMClientContext {
   return Boolean(value?.client);
 }
 
@@ -81,12 +70,7 @@ async function executeConfiguredWebSearch(
   context: ToolExecutionContext,
   configuredEnv: Record<string, string>,
 ): Promise<ToolExecutionResult> {
-  const execution = await runWebSearchScript(
-    scriptPath,
-    query,
-    context,
-    configuredEnv,
-  );
+  const execution = await runWebSearchScript(scriptPath, query, context, configuredEnv);
   const output = execution.stdout.slice(0, MAX_OUTPUT_CHARS);
   const truncated = execution.stdout.length > MAX_OUTPUT_CHARS;
 
@@ -142,7 +126,7 @@ async function executeDefaultWebSearch(
     ok: false,
     name: "WebSearch",
     error:
-      'WebSearch requires a configured search tool. Set "webSearchTool" in ~/.hex4code/settings.json to a search script path.',
+      "WebSearch requires a configured search tool. Set \"webSearchTool\" in ~/.hex4code/settings.json to a search script path.",
   };
 }
 
@@ -151,13 +135,7 @@ async function runWebSearchScript(
   query: string,
   context: ToolExecutionContext,
   configuredEnv: Record<string, string>,
-): Promise<{
-  stdout: string;
-  stderr: string;
-  exitCode: number | null;
-  signal: string | null;
-  error?: string;
-}> {
+): Promise<{ stdout: string; stderr: string; exitCode: number | null; signal: string | null; error?: string }> {
   return new Promise((resolve) => {
     const child = spawn(scriptPath, [query], {
       cwd: context.projectRoot,
@@ -199,10 +177,7 @@ async function runWebSearchScript(
   });
 }
 
-async function prepareSearchQuery(
-  query: string,
-  llmContext: LLMClientContext,
-): Promise<SearchPreparation> {
+async function prepareSearchQuery(query: string, llmContext: LLMClientContext): Promise<SearchPreparation> {
   const decision = await decideSearchLanguage(query, llmContext);
   const containsChinese = containsChineseChar(query);
 
@@ -239,10 +214,7 @@ function containsChineseChar(text: string): boolean {
   return /[\u4e00-\u9fff]/.test(text);
 }
 
-async function decideSearchLanguage(
-  query: string,
-  llmContext: LLMClientContext,
-): Promise<SearchDecision> {
+async function decideSearchLanguage(query: string, llmContext: LLMClientContext): Promise<SearchDecision> {
   const prompt = `Decide whether the topic below has more useful online material in English or Chinese.
 
 Topic:
@@ -258,9 +230,7 @@ Do not include markdown or any extra text.`;
   const dominantLanguage = result.dominant_language;
 
   if (dominantLanguage !== "en" && dominantLanguage !== "zh") {
-    throw new Error(
-      `Unexpected dominant language: ${String(dominantLanguage)}`,
-    );
+    throw new Error(`Unexpected dominant language: ${String(dominantLanguage)}`);
   }
 
   return {
@@ -290,10 +260,7 @@ ${query}
     .replace(/^['"]|['"]$/g, "");
 }
 
-async function chat(
-  llmContext: LLMClientContext,
-  prompt: string,
-): Promise<string> {
+async function chat(llmContext: LLMClientContext, prompt: string): Promise<string> {
   const response = await llmContext.client.chat.completions.create({
     model: llmContext.model,
     messages: [{ role: "user", content: prompt }],
@@ -320,10 +287,7 @@ function parseJsonResponse(text: string): Record<string, unknown> {
     const firstBrace = cleaned.indexOf("{");
     const lastBrace = cleaned.lastIndexOf("}");
     if (firstBrace >= 0 && lastBrace > firstBrace) {
-      return JSON.parse(cleaned.slice(firstBrace, lastBrace + 1)) as Record<
-        string,
-        unknown
-      >;
+      return JSON.parse(cleaned.slice(firstBrace, lastBrace + 1)) as Record<string, unknown>;
     }
     throw new Error(`Failed to parse JSON response: ${cleaned || "<empty>"}`);
   }
@@ -340,7 +304,7 @@ async function runDefaultWebSearchRequest(
   _context: ToolExecutionContext,
 ): Promise<string> {
   throw new Error(
-    'WebSearch requires a configured search tool. Set "webSearchTool" in ~/.hex4code/settings.json to a search script path.',
+    "WebSearch requires a configured search tool. Set \"webSearchTool\" in ~/.hex4code/settings.json to a search script path.",
   );
 }
 
@@ -357,16 +321,11 @@ function formatWebSearchActivityLabel(query: string): string {
   const normalizedQuery = query.replace(/\s+/g, " ").trim();
   const maxQueryLength = 180;
   const clippedQuery =
-    normalizedQuery.length > maxQueryLength
-      ? `${normalizedQuery.slice(0, maxQueryLength - 3)}...`
-      : normalizedQuery;
+    normalizedQuery.length > maxQueryLength ? `${normalizedQuery.slice(0, maxQueryLength - 3)}...` : normalizedQuery;
   return `${WEB_SEARCH_TOOL_ACTIVITY_PREFIX} ${clippedQuery}`;
 }
 
-function buildCommandError(
-  exitCode: number | null,
-  signal: string | null,
-): string {
+function buildCommandError(exitCode: number | null, signal: string | null): string {
   if (signal) {
     return `WebSearch command terminated by signal ${signal}.`;
   }

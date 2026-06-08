@@ -5,14 +5,7 @@ import type { TCType } from "./executor";
 
 // ── Symbol index data structures ──────────────────────────────────────
 
-export type SymbolKind =
-  | "function"
-  | "struct"
-  | "enum"
-  | "macro"
-  | "typedef"
-  | "global"
-  | "unknown";
+export type SymbolKind = "function" | "struct" | "enum" | "macro" | "typedef" | "global" | "unknown";
 
 export type SymbolEntry = {
   name: string;
@@ -45,8 +38,7 @@ const FUNCTION_PROTO_RE = /^(?:extern\s+)?(?:\w+\s+)+(\w+)\s*\([^)]*\)\s*;/m;
 const STRUCT_RE = /^typedef\s+struct\s+(\w+)\s*\{/m;
 const ENUM_RE = /^typedef\s+enum\s+(\w+)\s*\{/m;
 const MACRO_RE = /^#define\s+(\w+)\s+(.+)$/m;
-const TYPEDEF_RE =
-  /^typedef\s+(?:struct|enum|union)\s+\w+\s*\{[\s\S]*?\}\s*(\w+)\s*;/m;
+const TYPEDEF_RE = /^typedef\s+(?:struct|enum|union)\s+\w+\s*\{[\s\S]*?\}\s*(\w+)\s*;/m;
 const GLOBAL_VAR_RE = /^(?:\w+\s+)+(\w+)\s*(?:=\s*[^;]+)?\s*;/m;
 
 export async function handleCodeIndexTool(
@@ -54,14 +46,9 @@ export async function handleCodeIndexTool(
   context: ToolExecutionContext,
 ): Promise<ToolExecutionResult> {
   const query = typeof args.query === "string" ? args.query.trim() : "";
-  const kindFilter =
-    typeof args.type === "string" ? args.type.trim().toLowerCase() : "";
-  const projectFilter =
-    typeof args.project === "string" ? args.project.trim() : "";
-  const contextLines =
-    typeof args.context === "number"
-      ? Math.max(1, Math.min(20, args.context))
-      : 5;
+  const kindFilter = typeof args.type === "string" ? args.type.trim().toLowerCase() : "";
+  const projectFilter = typeof args.project === "string" ? args.project.trim() : "";
+  const contextLines = typeof args.context === "number" ? Math.max(1, Math.min(20, args.context)) : 5;
 
   if (!query) {
     return {
@@ -110,12 +97,7 @@ export async function handleCodeIndexTool(
   // TC_UNCERTAIN: substring/fuzzy match (score < 50) or no result
   // TC_MIXED:     not applicable for single-query search
   const bestScore = top.length > 0 ? scoreRelevance(top[0].name, query) : 0;
-  const codeIndexTC: TCType =
-    bestScore >= 100
-      ? "TC_NONE"
-      : bestScore >= 50
-        ? "TC_CARRY"
-        : "TC_UNCERTAIN";
+  const codeIndexTC: TCType = bestScore >= 100 ? "TC_NONE" : bestScore >= 50 ? "TC_CARRY" : "TC_UNCERTAIN";
 
   if (top.length === 0) {
     return {
@@ -123,10 +105,7 @@ export async function handleCodeIndexTool(
       name: "codeIndex",
       output: `No symbols found matching "${query}".`,
       tcState: "TC_UNCERTAIN",
-      metadata: {
-        scanned_dirs: scanDirs.length,
-        total_files: countScannedFiles(scanDirs),
-      },
+      metadata: { scanned_dirs: scanDirs.length, total_files: countScannedFiles(scanDirs) },
     };
   }
 
@@ -159,9 +138,7 @@ export async function handleCodeIndexTool(
 function getOrBuildCache(dir: string): IndexCache | null {
   // LRU eviction: prune oldest when at capacity
   if (indexCacheByRoot.size >= MAX_CACHED_ROOTS && !indexCacheByRoot.has(dir)) {
-    const oldest = [...indexCacheByRoot.entries()].sort(
-      (a, b) => a[1].lastAccess - b[1].lastAccess,
-    )[0];
+    const oldest = [...indexCacheByRoot.entries()].sort((a, b) => a[1].lastAccess - b[1].lastAccess)[0];
     indexCacheByRoot.delete(oldest[0]);
   }
 
@@ -255,12 +232,7 @@ function parseFileSymbols(content: string, filePath: string): SymbolEntry[] {
     const line = lines[i];
     const trimmed = line.trim();
 
-    if (
-      !trimmed ||
-      trimmed.startsWith("//") ||
-      trimmed.startsWith("/*") ||
-      trimmed.startsWith("*")
-    ) {
+    if (!trimmed || trimmed.startsWith("//") || trimmed.startsWith("/*") || trimmed.startsWith("*")) {
       i += 1;
       continue;
     }
@@ -296,14 +268,7 @@ function parseFileSymbols(content: string, filePath: string): SymbolEntry[] {
             .substring(0, 100);
           const doc = extractDocComment(lines, i - 1);
           if (!isDuplicateName(entries, funcName[1], filePath))
-            entries.push({
-              name: funcName[1],
-              kind: "function",
-              file: filePath,
-              line: i + 1,
-              signature,
-              doc,
-            });
+            entries.push({ name: funcName[1], kind: "function", file: filePath, line: i + 1, signature, doc });
           i = blockStart + 1;
           continue;
         }
@@ -363,18 +328,9 @@ function listSourceFiles(dir: string): string[] {
     const entries = fs.readdirSync(dir, { withFileTypes: true });
     for (const entry of entries) {
       const fullPath = path.join(dir, entry.name);
-      if (
-        entry.isFile() &&
-        (entry.name.endsWith(".c") ||
-          entry.name.endsWith(".h") ||
-          entry.name.endsWith(".cpp"))
-      ) {
+      if (entry.isFile() && (entry.name.endsWith(".c") || entry.name.endsWith(".h") || entry.name.endsWith(".cpp"))) {
         results.push(fullPath);
-      } else if (
-        entry.isDirectory() &&
-        !entry.name.startsWith(".") &&
-        entry.name !== "node_modules"
-      ) {
+      } else if (entry.isDirectory() && !entry.name.startsWith(".") && entry.name !== "node_modules") {
         results.push(...listSourceFiles(fullPath));
       }
     }
@@ -448,11 +404,7 @@ function isKeyword(name: string): boolean {
   return keywords.has(name);
 }
 
-function isDuplicateName(
-  entries: SymbolEntry[],
-  name: string,
-  filePath: string,
-): boolean {
+function isDuplicateName(entries: SymbolEntry[], name: string, filePath: string): boolean {
   return entries.some((e) => e.name === name && e.file === filePath);
 }
 
@@ -490,10 +442,7 @@ function resolveScanDirs(root: string, projectFilter: string): string[] {
     try {
       const entries = fs.readdirSync(root, { withFileTypes: true });
       for (const e of entries) {
-        if (
-          e.isDirectory() &&
-          e.name.toLowerCase().includes(projectFilter.toLowerCase())
-        ) {
+        if (e.isDirectory() && e.name.toLowerCase().includes(projectFilter.toLowerCase())) {
           return [path.join(root, e.name)];
         }
       }

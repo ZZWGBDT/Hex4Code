@@ -1,18 +1,9 @@
 import * as fs from "fs";
 import * as path from "path";
 import ignore from "ignore";
-import type {
-  ToolExecutionContext,
-  ToolExecutionFollowUpMessage,
-  ToolExecutionResult,
-} from "./executor";
+import type { ToolExecutionContext, ToolExecutionFollowUpMessage, ToolExecutionResult } from "./executor";
 import { readTextFileWithMetadata } from "../common/file-utils";
-import {
-  createSnippet,
-  isAbsoluteFilePath,
-  markFileRead,
-  normalizeFilePath,
-} from "../common/state";
+import { createSnippet, isAbsoluteFilePath, markFileRead, normalizeFilePath } from "../common/state";
 
 const DEFAULT_LINE_LIMIT = 2000;
 const MAX_LINE_LENGTH = 2000;
@@ -66,8 +57,7 @@ export async function handleReadTool(
   args: Record<string, unknown>,
   context: ToolExecutionContext,
 ): Promise<ToolExecutionResult> {
-  let filePath =
-    typeof args.file_path === "string" ? normalizeFilePath(args.file_path) : "";
+  let filePath = typeof args.file_path === "string" ? normalizeFilePath(args.file_path) : "";
   if (!filePath.trim()) {
     return {
       ok: false,
@@ -86,9 +76,7 @@ export async function handleReadTool(
     }
     const normalizedSuffix = normalizeRelativeSuffix(filePath);
     const isIgnored = loadGitignoreMatcher(context.projectRoot);
-    const matches = normalizedSuffix
-      ? findSuffixMatches(context.projectRoot, normalizedSuffix, isIgnored)
-      : [];
+    const matches = normalizedSuffix ? findSuffixMatches(context.projectRoot, normalizedSuffix, isIgnored) : [];
     if (matches.length > 1) {
       return {
         ok: false,
@@ -106,9 +94,7 @@ export async function handleReadTool(
         return {
           ok: false,
           name: "read",
-          error:
-            "file_path must be an absolute path. " +
-            `The file_path "${filePath}" is ambiguous.`,
+          error: "file_path must be an absolute path. " + `The file_path "${filePath}" is ambiguous.`,
         };
       } else {
         return {
@@ -167,17 +153,12 @@ export async function handleReadTool(
     }
 
     if (ext === ".pdf") {
-      const pagesParam =
-        typeof args.pages === "string" ? args.pages.trim() : "";
+      const pagesParam = typeof args.pages === "string" ? args.pages.trim() : "";
       const buffer = fs.readFileSync(filePath);
       const pageCount = countPdfPages(buffer);
       const pageRange = pagesParam ? parsePageRange(pagesParam) : null;
 
-      if (
-        !pageRange &&
-        pageCount !== null &&
-        pageCount > PDF_LARGE_PAGE_THRESHOLD
-      ) {
+      if (!pageRange && pageCount !== null && pageCount > PDF_LARGE_PAGE_THRESHOLD) {
         return {
           ok: false,
           name: "read",
@@ -263,9 +244,7 @@ export async function handleReadTool(
       content: textResult.content,
       timestamp: textResult.timestamp,
       offset: textResult.isPartialView ? textResult.startLine : undefined,
-      limit: textResult.isPartialView
-        ? Math.max(1, textResult.endLine - textResult.startLine + 1)
-        : undefined,
+      limit: textResult.isPartialView ? Math.max(1, textResult.endLine - textResult.startLine + 1) : undefined,
       isPartialView: textResult.isPartialView,
       encoding: textResult.encoding,
       lineEndings: textResult.lineEndings,
@@ -347,9 +326,7 @@ function findSuffixMatches(
   return matches;
 }
 
-function loadGitignoreMatcher(
-  projectRoot: string,
-): ((relPath: string, isDir: boolean) => boolean) | null {
+function loadGitignoreMatcher(projectRoot: string): ((relPath: string, isDir: boolean) => boolean) | null {
   const gitignorePath = path.join(projectRoot, ".gitignore");
   if (!fs.existsSync(gitignorePath)) {
     const ig = ignore();
@@ -408,9 +385,7 @@ function parseLineNumber(
   return { ok: true, value: integer };
 }
 
-function parseLineLimit(
-  value: unknown,
-): { ok: true; value: number } | { ok: false; error: string } {
+function parseLineLimit(value: unknown): { ok: true; value: number } | { ok: false; error: string } {
   if (value === undefined || value === null) {
     return { ok: true, value: DEFAULT_LINE_LIMIT };
   }
@@ -425,11 +400,7 @@ function parseLineLimit(
   return { ok: true, value: integer };
 }
 
-function readTextFile(
-  filePath: string,
-  offset: number | null,
-  limit: number,
-): TextReadResult {
+function readTextFile(filePath: string, offset: number | null, limit: number): TextReadResult {
   const metadata = readTextFileWithMetadata(filePath);
   const raw = metadata.content;
   if (!raw) {
@@ -465,8 +436,7 @@ function readTextFile(
   const endIndex = startIndex + limit;
   const selected = lines.slice(startIndex, endIndex);
   const startLine = startIndex + 1;
-  const endLine =
-    selected.length > 0 ? startIndex + selected.length : startLine;
+  const endLine = selected.length > 0 ? startIndex + selected.length : startLine;
   const isPartialView = startLine !== 1 || endLine < lines.length;
   return {
     content: selected.join("\n"),
@@ -481,34 +451,18 @@ function readTextFile(
   };
 }
 
-function formatWithLineNumbers(
-  lines: string[],
-  startLineNumber: number,
-): string {
+function formatWithLineNumbers(lines: string[], startLineNumber: number): string {
   return lines
     .map((line, index) => {
       const lineNumber = startLineNumber + index;
-      const trimmedLine =
-        line.length > MAX_LINE_LENGTH ? line.slice(0, MAX_LINE_LENGTH) : line;
+      const trimmedLine = line.length > MAX_LINE_LENGTH ? line.slice(0, MAX_LINE_LENGTH) : line;
       return `${String(lineNumber).padStart(LINE_NUMBER_WIDTH, " ")}\t${trimmedLine}`;
     })
     .join("\n");
 }
 
 function isImageExtension(ext: string): boolean {
-  return [
-    ".png",
-    ".jpg",
-    ".jpeg",
-    ".gif",
-    ".webp",
-    ".bmp",
-    ".tif",
-    ".tiff",
-    ".svg",
-    ".ico",
-    ".avif",
-  ].includes(ext);
+  return [".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".tif", ".tiff", ".svg", ".ico", ".avif"].includes(ext);
 }
 
 function getImageMimeType(ext: string): string {
@@ -537,17 +491,12 @@ function getImageMimeType(ext: string): string {
   }
 }
 
-function buildImageFollowUpMessage(
-  filePath: string,
-  mime: string,
-  buffer: Buffer,
-): ToolExecutionFollowUpMessage {
+function buildImageFollowUpMessage(filePath: string, mime: string, buffer: Buffer): ToolExecutionFollowUpMessage {
   const fileName = path.basename(filePath);
   return {
     role: "system",
     content:
-      `The read tool has loaded \`${fileName}\`. ` +
-      "Use the attached image content to answer the original request.",
+      `The read tool has loaded \`${fileName}\`. ` + "Use the attached image content to answer the original request.",
     contentParams: [
       {
         type: "image_url",
@@ -635,8 +584,7 @@ function readNotebook(filePath: string): string {
 
     const outputs = Array.isArray(cell.outputs) ? cell.outputs : [];
     outputs.forEach((output, outputIndex) => {
-      const outputType =
-        typeof output.output_type === "string" ? output.output_type : "output";
+      const outputType = typeof output.output_type === "string" ? output.output_type : "output";
       lines.push(`# Output ${outputIndex + 1} (${outputType})`);
       lines.push(...formatNotebookOutput(output));
     });
@@ -673,9 +621,7 @@ function formatNotebookOutput(output: Record<string, unknown>): string[] {
     const record = data as Record<string, unknown>;
     const textPlain = record["text/plain"];
     if (Array.isArray(textPlain)) {
-      lines.push(
-        ...textPlain.map((item) => String(item).replace(/\r?\n$/, "")),
-      );
+      lines.push(...textPlain.map((item) => String(item).replace(/\r?\n$/, "")));
     } else if (typeof textPlain === "string") {
       lines.push(...textPlain.split(/\r?\n/));
     }

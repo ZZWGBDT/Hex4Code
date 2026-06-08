@@ -119,7 +119,7 @@ export function App({
     const { setAgentMode, getAgentMode } = require("@hex4code/core/agent-mode");
     setAgentMode(effectiveMode);
     process.stderr.write(
-      `[HEX4] Project mode: ${getModeLabel(effectiveMode)}${validatedOverride ? " (env override)" : ""}\n`,
+      `[HEX4] Project Mode: ${getModeLabel(effectiveMode)}${validatedOverride ? " (env override)" : ""}\n`,
     );
 
     return new SessionManager({
@@ -1515,7 +1515,7 @@ export function App({
                   `✅ ${provider.name} API key saved to ~/.hex4code/settings.json\n`,
                 ),
               );
-              // ── API Key 验证 ──────────────────────────────
+              // ── API Key Verification ──────────────────────────────
               process.stdout.write(chalk.dim(`⏳ Testing connection...`));
               try {
                 const { testProviderConnection } =
@@ -1570,7 +1570,7 @@ export function App({
               chalk.dim("  Use /provider set <name> to configure one.\n"),
             );
           } else {
-            // 并行测试所有已配置的 Provider
+            // Test all configured providers in parallel
             const results = await Promise.allSettled(
               configured.map(async (pid) => {
                 const p = PROVIDERS.find((pr) => pr.id === pid);
@@ -1779,6 +1779,48 @@ export function App({
     [sessionManager, refreshSkills],
   );
 
+  const handleDeleteSession = useCallback(
+    (sessionId: string) => {
+      const activeId = sessionManager.getActiveSessionId();
+      const deleted = sessionManager.deleteSession(sessionId);
+      if (deleted && activeId === sessionId) {
+        sessionManager.setActiveSessionId(null);
+        setMessages([]);
+        setStatusLine("");
+        setRunningProcesses(null);
+        setActiveStatus(null);
+      }
+      refreshSessionsList();
+    },
+    [sessionManager, refreshSessionsList],
+  );
+
+  const handleExportSession = useCallback(
+    (sessionId: string) => {
+      try {
+        const outPath = sessionManager.exportSession(sessionId);
+        process.stderr.write(`\n✅ Exported to ${outPath}\n`);
+      } catch (error) {
+        process.stderr.write(
+          `\n❌ Export failed: ${error instanceof Error ? error.message : String(error)}\n`,
+        );
+      }
+    },
+    [sessionManager],
+  );
+
+  const handleRenameSession = useCallback(
+    (sessionId: string, newName: string) => {
+      sessionManager.renameSession(sessionId, newName);
+      refreshSessionsList();
+      const activeId = sessionManager.getActiveSessionId();
+      if (activeId === sessionId) {
+        setStatusLine((prev) => prev); // trigger re-render with updated summary
+      }
+    },
+    [sessionManager, refreshSessionsList],
+  );
+
   const [stableColumns, setStableColumns] = useState(columns);
   useEffect(() => {
     const timer = setTimeout(() => setStableColumns(columns), 100);
@@ -1938,6 +1980,9 @@ export function App({
           sessions={sessions}
           onSelect={(id) => void handleSelectSession(id)}
           onCancel={() => setView("chat")}
+          onDelete={(id) => handleDeleteSession(id)}
+          onExport={(id) => handleExportSession(id)}
+          onRename={(id, name) => handleRenameSession(id, name)}
         />
       ) : shouldShowQuestionPrompt && pendingQuestion && !busy ? (
         <AskUserQuestionPrompt
@@ -2117,7 +2162,7 @@ export function createOpenAIClient(projectRoot: string = process.cwd()): {
 } {
   const settings = resolveCurrentSettings(projectRoot);
 
-  // 使用多模型路由引擎选择聊天模型
+  // Use multi-model routing engine to select the chat model
   const route = resolveProviderRoute("chat", {
     model: settings.model,
     routing: settings.taskModels,
